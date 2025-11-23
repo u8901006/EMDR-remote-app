@@ -1,0 +1,8 @@
+{
+  "name": "MindSync EMDR",
+  "description": "A professional-grade remote EMDR therapy application enabling real-time synchronization between therapist and client via browser tabs, featuring Gemini-powered session assistance.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
