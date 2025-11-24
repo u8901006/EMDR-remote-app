@@ -1,85 +1,103 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { EMDRSettings, SessionMessage, ClientStatus } from '../types';
-import { DEFAULT_SETTINGS, BROADCAST_CHANNEL_NAME } from '../constants';
+import { DEFAULT_SETTINGS } from '../constants';
+import { useLiveKitContext } from '../contexts/LiveKitContext';
+import { RoomEvent, DataPacket_Kind, Participant } from 'livekit-client';
 
 export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
+  const { room } = useLiveKitContext();
   const [settings, setSettings] = useState<EMDRSettings>(DEFAULT_SETTINGS);
   const [clientStatus, setClientStatus] = useState<ClientStatus | null>(null);
-  const channelRef = useRef<BroadcastChannel | null>(null);
+  
+  // Refs to handle stale closures in event listeners
   const settingsRef = useRef<EMDRSettings>(settings);
 
-  // Keep ref in sync with state to avoid stale closures in event listeners
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
 
-  // Initialize BroadcastChannel
+  // Data Packet Listener
   useEffect(() => {
-    const channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
-    channelRef.current = channel;
+    if (!room) return;
 
-    channel.onmessage = (event: MessageEvent<SessionMessage>) => {
-      const { type, payload, clientStatus: statusPayload } = event.data;
-      
-      if (type === 'SYNC_SETTINGS' && payload) {
-        // If we are client, we blindly accept settings
-        if (role === 'CLIENT') {
-            setSettings(prev => ({ ...prev, ...payload }));
+    const handleData = (payload: Uint8Array, participant?: Participant, kind?: DataPacket_Kind, topic?: string) => {
+      try {
+        const str = new TextDecoder().decode(payload);
+        const message = JSON.parse(str) as SessionMessage;
+
+        if (message.type === 'SYNC_SETTINGS' && message.payload) {
+          if (role === 'CLIENT') {
+             // console.log("Received Settings Sync:", message.payload);
+             setSettings(prev => ({ ...prev, ...message.payload }));
+          }
+        } else if (message.type === 'REQUEST_SYNC' && role === 'THERAPIST') {
+          console.log("Client requested sync. Sending current state...");
+          sendData({
+            type: 'SYNC_SETTINGS',
+            payload: settingsRef.current,
+            timestamp: Date.now()
+          });
+        } else if (message.type === 'CLIENT_STATUS' && role === 'THERAPIST' && message.clientStatus) {
+          setClientStatus(message.clientStatus);
         }
-      } else if (type === 'REQUEST_SYNC' && role === 'THERAPIST') {
-        // A new client joined and wants the current state
-        // Use ref to get the absolute latest settings, avoiding closure staleness
-        channel.postMessage({
-          type: 'SYNC_SETTINGS',
-          payload: settingsRef.current,
-          timestamp: Date.now()
-        });
-      } else if (type === 'CLIENT_STATUS' && role === 'THERAPIST' && statusPayload) {
-        setClientStatus(statusPayload);
+      } catch (e) {
+        console.error("Failed to parse data packet:", e);
       }
     };
 
-    // If Client, ask for current state immediately upon mounting
+    room.on(RoomEvent.DataReceived, handleData);
+
+    // If Client, request sync immediately upon connection
     if (role === 'CLIENT') {
-      channel.postMessage({
-        type: 'REQUEST_SYNC',
-        timestamp: Date.now()
-      });
+       // Allow a brief moment for connection stability before requesting
+       setTimeout(() => {
+           sendData({ type: 'REQUEST_SYNC', timestamp: Date.now() });
+       }, 500);
     }
 
     return () => {
-      channel.close();
+      room.off(RoomEvent.DataReceived, handleData);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role]);
+  }, [room, role]);
 
-  // Function for Therapist to broadcast updates
+  // Helper to send data via LiveKit
+  // reliable: true (TCP-like) for critical settings
+  // reliable: false (UDP-like) for high-frequency sensor data
+  const sendData = (message: SessionMessage, reliable: boolean = true) => {
+    if (!room) return;
+    const str = JSON.stringify(message);
+    const data = new TextEncoder().encode(str);
+    
+    room.localParticipant.publishData(data, { reliable });
+  };
+
+  // Function for Therapist to update and broadcast settings
   const updateSettings = useCallback((newSettings: Partial<EMDRSettings>) => {
     setSettings(prev => {
       const updated = { ...prev, ...newSettings };
       
-      // Only broadcast if we are the therapist
-      if (role === 'THERAPIST' && channelRef.current) {
-        channelRef.current.postMessage({
+      // Update local state immediately. 
+      // If connected, broadcast to others using RELIABLE transmission (Settings are critical).
+      if (role === 'THERAPIST' && room) {
+        sendData({
           type: 'SYNC_SETTINGS',
           payload: updated,
           timestamp: Date.now()
-        });
+        }, true);
       }
       return updated;
     });
-  }, [role]);
+  }, [role, room]);
 
   // Auto-stop logic for Therapist
   useEffect(() => {
     let timeoutId: number;
-
     if (role === 'THERAPIST' && settings.isPlaying && settings.durationSeconds > 0) {
       timeoutId = window.setTimeout(() => {
         updateSettings({ isPlaying: false });
       }, settings.durationSeconds * 1000);
     }
-
     return () => {
       if (timeoutId) window.clearTimeout(timeoutId);
     };
@@ -87,14 +105,16 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
 
   // Function for Client to broadcast status
   const sendClientStatus = useCallback((status: ClientStatus) => {
-    if (role === 'CLIENT' && channelRef.current) {
-        channelRef.current.postMessage({
+    if (role === 'CLIENT' && room) {
+        // Use UNRELIABLE transmission for sensor data to prevent head-of-line blocking
+        // and reduce latency for real-time monitoring.
+        sendData({
             type: 'CLIENT_STATUS',
             clientStatus: status,
             timestamp: Date.now()
-        });
+        }, false);
     }
-  }, [role]);
+  }, [role, room]);
 
   return { settings, updateSettings, clientStatus, sendClientStatus };
 };
