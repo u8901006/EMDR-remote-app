@@ -13,6 +13,8 @@ export enum MovementPattern {
   ALTERNATED = 'ALTERNATED'
 }
 
+export type Language = 'en' | 'zh-TW';
+
 export interface EMDRSettings {
   isPlaying: boolean;
   speed: number; // 1-100

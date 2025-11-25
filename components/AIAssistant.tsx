@@ -2,21 +2,29 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, AlertCircle, FileText, User, X } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { generateAssistantResponse, suggestGroundingTechnique } from '../services/gemini';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const AIAssistant: React.FC = () => {
+  const { t, language } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [inputMode, setInputMode] = useState<'chat' | 'grounding'>('chat');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      role: 'model',
-      text: 'Hello. I can assist with grounding scripts, session notes, or resource installation ideas. How can I help?',
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMessages([
+      {
+        id: 'welcome',
+        role: 'model',
+        text: language === 'zh-TW' 
+              ? '您好，我是您的 AI 臨床助理。我可以提供著陸技術腳本、協助撰寫筆記或提供資源建議。' 
+              : 'Hello. I can assist with grounding scripts, session notes, or resource installation ideas. How can I help?',
+        timestamp: new Date()
+      }
+    ]);
+  }, [language]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -30,21 +38,19 @@ const AIAssistant: React.FC = () => {
     if (!input.trim()) return;
 
     const userText = input;
-    setInput(''); // Clear input immediately
+    setInput(''); 
     setIsLoading(true);
 
     if (inputMode === 'grounding') {
-        // Handle Grounding Request
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
             role: 'user',
-            text: `Request: Grounding technique for "${userText}"`,
+            text: `${t('ai.btn.grounding')}: ${userText}`,
             timestamp: new Date()
         };
         setMessages(prev => [...prev, userMsg]);
 
-        // Use the specialized service with the user's description
-        const responseText = await suggestGroundingTechnique(userText);
+        const responseText = await suggestGroundingTechnique(userText, language);
 
         const aiMsg: ChatMessage = {
             id: (Date.now() + 1).toString(),
@@ -53,9 +59,8 @@ const AIAssistant: React.FC = () => {
             timestamp: new Date()
         };
         setMessages(prev => [...prev, aiMsg]);
-        setInputMode('chat'); // Return to normal chat mode
+        setInputMode('chat');
     } else {
-        // Handle Normal Chat
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
             role: 'user',
@@ -64,7 +69,7 @@ const AIAssistant: React.FC = () => {
         };
         setMessages(prev => [...prev, userMsg]);
 
-        const responseText = await generateAssistantResponse(userText, messages);
+        const responseText = await generateAssistantResponse(userText, messages, language);
 
         const aiMsg: ChatMessage = {
             id: (Date.now() + 1).toString(),
@@ -82,9 +87,8 @@ const AIAssistant: React.FC = () => {
     if (action === 'grounding') {
         setInputMode('grounding');
         setInput('');
-        // Note: We rely on the UI change to prompt the user for input now
     } else if (action === 'safe_place') {
-        setInput("Give me a script for establishing a Safe/Calm Place resource.");
+        setInput(language === 'zh-TW' ? "請提供建立「安全地/平靜地」資源的腳本。" : "Give me a script for establishing a Safe/Calm Place resource.");
         setInputMode('chat');
     }
   };
@@ -96,7 +100,7 @@ const AIAssistant: React.FC = () => {
           <div className="bg-slate-800 p-3 border-b border-slate-700 flex justify-between items-center">
             <h3 className="text-white font-medium flex items-center gap-2">
               <Sparkles size={16} className="text-blue-400" />
-              AI Clinical Assistant
+              {t('ai.title')}
             </h3>
             <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white">&times;</button>
           </div>
@@ -128,15 +132,14 @@ const AIAssistant: React.FC = () => {
           </div>
 
           <div className="bg-slate-800 border-t border-slate-700">
-             {/* Context Indicator for Grounding Mode */}
              {inputMode === 'grounding' && (
                 <div className="flex items-center justify-between px-3 py-2 bg-blue-900/30 border-b border-slate-700 text-xs text-blue-300">
-                    <span className="font-medium">Describing Client State...</span>
+                    <span className="font-medium">{t('ai.context.grounding')}</span>
                     <button 
                         onClick={() => { setInputMode('chat'); setInput(''); }} 
                         className="text-slate-400 hover:text-white flex items-center gap-1"
                     >
-                        Cancel <X size={12} />
+                        {t('ai.cancel')} <X size={12} />
                     </button>
                 </div>
             )}
@@ -147,19 +150,19 @@ const AIAssistant: React.FC = () => {
                     onClick={() => handleQuickAction('grounding')}
                     className={`px-3 py-1 text-xs rounded-full whitespace-nowrap flex items-center gap-1 transition-colors ${inputMode === 'grounding' ? 'bg-blue-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'}`}
                 >
-                    <AlertCircle size={12} /> Grounding
+                    <AlertCircle size={12} /> {t('ai.btn.grounding')}
                 </button>
                 <button 
                     onClick={() => handleQuickAction('safe_place')}
                     className="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-full whitespace-nowrap flex items-center gap-1 transition-colors"
                 >
-                    <User size={12} /> Safe Place
+                    <User size={12} /> {t('ai.btn.safeplace')}
                 </button>
                 <button 
-                    onClick={() => setInput("Summarize the key themes from a session focusing on childhood trauma.")}
+                    onClick={() => setInput(language === 'zh-TW' ? "請總結本次療程關於童年創傷的重點。" : "Summarize the key themes from a session focusing on childhood trauma.")}
                     className="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-full whitespace-nowrap flex items-center gap-1 transition-colors"
                 >
-                    <FileText size={12} /> Note Template
+                    <FileText size={12} /> {t('ai.btn.notes')}
                 </button>
                 </div>
                 <div className="flex gap-2">
@@ -168,7 +171,7 @@ const AIAssistant: React.FC = () => {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    placeholder={inputMode === 'grounding' ? "e.g., Hyperarousal, Freezing, Panic..." : "Ask for scripts, suggestions..."}
+                    placeholder={inputMode === 'grounding' ? t('ai.placeholder.grounding') : t('ai.placeholder.chat')}
                     className="flex-1 bg-slate-950 border border-slate-700 text-white text-sm rounded-md px-3 py-2 focus:outline-none focus:border-blue-500"
                     autoFocus={inputMode === 'grounding'}
                 />
@@ -190,11 +193,11 @@ const AIAssistant: React.FC = () => {
         className="bg-blue-600 hover:bg-blue-500 text-white p-4 rounded-full shadow-lg transition-transform hover:scale-105 flex items-center gap-2 font-medium"
       >
         {isOpen ? (
-            <>Close Assistant</>
+            <>{t('ai.cancel')}</>
         ) : (
             <>
                 <Sparkles size={20} />
-                AI Assistant
+                {t('ai.title')}
             </>
         )}
       </button>

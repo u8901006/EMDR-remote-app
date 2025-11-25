@@ -1,8 +1,7 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { Language } from '../types';
 
 // Initialize Gemini API
-// NOTE: In a real production app, you should proxy this through a backend or use a secure way to handle keys.
-// Since this is a client-side demo, we use the env var directly.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
 const SYSTEM_INSTRUCTION = `You are an empathetic, professional clinical assistant for an EMDR therapist. 
@@ -12,7 +11,8 @@ Do not diagnose. Focus on facilitating the therapy process.`;
 
 export const generateAssistantResponse = async (
   prompt: string, 
-  history: { role: 'user' | 'model', text: string }[] = []
+  history: { role: 'user' | 'model', text: string }[] = [],
+  language: Language = 'en'
 ): Promise<string> => {
   if (!process.env.API_KEY) {
     return "API Key is missing. Please check your configuration.";
@@ -21,9 +21,13 @@ export const generateAssistantResponse = async (
   try {
     const model = 'gemini-2.5-flash';
     
-    // Format history for context if needed, though for simple helper requests single-turn is often enough.
-    // We will just append previous context to the prompt for simplicity in this helper.
+    let languageInstruction = "";
+    if (language === 'zh-TW') {
+        languageInstruction = "IMPORTANT: Please reply in Traditional Chinese (繁體中文).";
+    }
+
     const fullPrompt = `
+      ${languageInstruction}
       Context from previous interactions:
       ${history.map(h => `${h.role}: ${h.text}`).join('\n')}
       
@@ -46,8 +50,13 @@ export const generateAssistantResponse = async (
   }
 };
 
-export const suggestGroundingTechnique = async (clientStateDescription: string): Promise<string> => {
+export const suggestGroundingTechnique = async (clientStateDescription: string, language: Language = 'en'): Promise<string> => {
+  let langRequest = "";
+  if (language === 'zh-TW') {
+      langRequest = "Provide the response in Traditional Chinese (繁體中文).";
+  }
+
   const prompt = `Suggest a specific, brief grounding technique for a client who is currently experiencing: ${clientStateDescription}. 
-  Provide the script the therapist can read directly to the client.`;
-  return generateAssistantResponse(prompt);
+  Provide the script the therapist can read directly to the client. ${langRequest}`;
+  return generateAssistantResponse(prompt, [], language);
 };

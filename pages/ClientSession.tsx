@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Maximize, Minimize, ArrowLeft, Loader2, Settings2, X, Clock, Sliders, Volume2, VolumeX, Gamepad2, Palette, Link as LinkIcon, AlertCircle } from 'lucide-react';
+import { Maximize, Minimize, ArrowLeft, Loader2, Settings2, X, Clock, Sliders, Volume2, VolumeX, Gamepad2, Palette, Link as LinkIcon, AlertCircle, Globe, Video, Activity } from 'lucide-react';
 import EMDRCanvas from '../components/EMDRCanvas';
 import EyeTracker from '../components/EyeTracker';
 import LiveVideo from '../components/LiveVideo';
@@ -8,8 +8,10 @@ import { useBroadcastSession } from '../hooks/useBroadcastSession';
 import { SessionRole, MovementPattern } from '../types';
 import { PRESET_COLORS, PRESET_BG_COLORS } from '../constants';
 import { useLiveKitContext } from '../contexts/LiveKitContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const ClientSession: React.FC = () => {
+  const { t, language, setLanguage } = useLanguage();
   const { settings, updateSettings, sendClientStatus } = useBroadcastSession(SessionRole.CLIENT);
   const { room, connect, isConnecting, error } = useLiveKitContext();
   
@@ -19,19 +21,16 @@ const ClientSession: React.FC = () => {
   const [isHoveringTop, setIsHoveringTop] = useState(false);
   const hideTimeoutRef = useRef<number>(0);
   
-  // Connection Form State
   const [tokenInput, setTokenInput] = useState(settings.liveKitClientToken || '');
   const [urlInput, setUrlInput] = useState(settings.liveKitUrl || '');
   
   const [viewMode, setViewMode] = useState<'canvas' | 'video'>('canvas');
 
-  // Auto-fill from settings if available (e.g. BroadcastChannel was used before, or defaults)
   useEffect(() => {
     if (settings.liveKitUrl) setUrlInput(settings.liveKitUrl);
     if (settings.liveKitClientToken) setTokenInput(settings.liveKitClientToken);
   }, [settings.liveKitUrl, settings.liveKitClientToken]);
 
-  // Hide Controls Timer
   const resetHideTimer = () => {
     if (showSettingsMenu || isHoveringTop || !room) {
         setShowControls(true);
@@ -71,7 +70,10 @@ const ClientSession: React.FC = () => {
     }
   };
 
-  // If NOT connected, show Modal
+  const handlePatternChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    updateSettings({ pattern: e.target.value as MovementPattern });
+  };
+
   if (!room) {
       return (
         <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
@@ -80,15 +82,13 @@ const ClientSession: React.FC = () => {
                     <div className="w-12 h-12 bg-blue-900/50 rounded-full flex items-center justify-center mb-4">
                         <LinkIcon className="text-blue-400" size={24} />
                     </div>
-                    <h2 className="text-xl font-bold text-white">Join Session</h2>
-                    <p className="text-slate-400 text-sm text-center mt-1">
-                        Enter the connection details provided by your therapist.
-                    </p>
+                    <h2 className="text-xl font-bold text-white">{t('client.join')}</h2>
+                    <p className="text-slate-400 text-sm text-center mt-1">{t('client.join.desc')}</p>
                  </div>
 
                  <div className="space-y-4">
                     <div>
-                        <label className="text-xs text-slate-500 uppercase font-bold tracking-wider">Server URL</label>
+                        <label className="text-xs text-slate-500 uppercase font-bold tracking-wider">{t('controls.serverUrl')}</label>
                         <input 
                             type="text" 
                             value={urlInput}
@@ -98,12 +98,12 @@ const ClientSession: React.FC = () => {
                         />
                     </div>
                     <div>
-                        <label className="text-xs text-slate-500 uppercase font-bold tracking-wider">Client Token</label>
+                        <label className="text-xs text-slate-500 uppercase font-bold tracking-wider">{t('controls.clientToken')}</label>
                         <input 
                             type="password" 
                             value={tokenInput}
                             onChange={(e) => setTokenInput(e.target.value)}
-                            placeholder="Paste your token here..."
+                            placeholder="Token..."
                             className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white focus:border-blue-500 outline-none mt-1"
                         />
                     </div>
@@ -119,32 +119,46 @@ const ClientSession: React.FC = () => {
                         disabled={isConnecting || !urlInput || !tokenInput}
                         className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                     >
-                        {isConnecting ? <Loader2 size={18} className="animate-spin" /> : 'Join Session'}
+                        {isConnecting ? <Loader2 size={18} className="animate-spin" /> : t('client.join')}
                     </button>
 
                     <div className="text-center mt-4">
-                        <Link to="/" className="text-slate-500 hover:text-white text-sm">Cancel</Link>
+                        <Link to="/" className="text-slate-500 hover:text-white text-sm">{t('ai.cancel')}</Link>
                     </div>
+                 </div>
+                 
+                 {/* Language Switcher for Join Screen */}
+                 <div className="mt-6 pt-4 border-t border-slate-800">
+                    <button 
+                        onClick={() => setLanguage(language === 'en' ? 'zh-TW' : 'en')}
+                        className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-white transition-colors text-xs"
+                    >
+                        <Globe size={12} />
+                        {language === 'en' ? 'Switch to 繁體中文' : 'Switch to English'}
+                    </button>
                  </div>
              </div>
         </div>
       );
   }
 
-  // Connected View
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black">
       
-      {/* 1. EMDR Canvas Layer */}
-      <div className={`transition-all duration-500 ease-in-out absolute ${
+      <div 
+        className={`transition-all duration-500 ease-in-out absolute ${
          viewMode === 'video'
-         ? 'bottom-4 right-4 w-64 h-48 z-20 rounded-xl overflow-hidden border border-slate-700 shadow-2xl'
+         ? 'bottom-4 right-4 w-64 h-48 z-20 rounded-xl overflow-hidden border border-slate-700 shadow-2xl cursor-pointer hover:scale-105'
          : 'inset-0 z-0'
-      }`}>
+        }`}
+        onClick={() => {
+            if (viewMode === 'video') setViewMode('canvas');
+        }}
+        title={viewMode === 'video' ? "Click to Maximize EMDR" : undefined}
+      >
          <EMDRCanvas settings={settings} role={SessionRole.CLIENT} />
       </div>
 
-      {/* 2. Live Video Layer */}
       <div className={`transition-all duration-500 ease-in-out absolute ${
         viewMode === 'canvas'
         ? 'top-4 left-4 w-72 h-48 z-30 shadow-2xl hover:scale-105'
@@ -157,23 +171,20 @@ const ClientSession: React.FC = () => {
         />
       </div>
 
-      {/* Invisible Eye Tracker */}
       <EyeTracker settings={settings} onStatusChange={sendClientStatus} />
 
-      {/* Hover Zone */}
       <div 
         className="absolute top-0 left-0 w-full h-32 z-40"
         onMouseEnter={() => setIsHoveringTop(true)}
         onMouseLeave={() => setIsHoveringTop(false)}
       />
 
-      {/* Floating Controls */}
       <div 
         className={`absolute top-0 left-0 w-full p-6 flex justify-between items-start pointer-events-none transition-opacity duration-300 z-50 ${showControls ? 'opacity-100' : 'opacity-0'}`}
       >
         <div className={`pointer-events-auto transition-all duration-300 ${viewMode === 'canvas' ? 'mt-48' : ''}`}>
             <Link to="/" className="flex items-center gap-2 text-slate-400 hover:text-white bg-black/60 hover:bg-black/80 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 transition-all shadow-lg">
-                <ArrowLeft size={16} /> End
+                <ArrowLeft size={16} /> {t('common.end')}
             </Link>
         </div>
 
@@ -181,14 +192,22 @@ const ClientSession: React.FC = () => {
              {!settings.isPlaying && viewMode === 'canvas' && (
                  <div className="flex items-center gap-2 text-slate-300 bg-black/60 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 shadow-lg">
                      <Loader2 size={16} className="animate-spin" />
-                     <span className="text-xs uppercase tracking-widest font-medium">Waiting...</span>
+                     <span className="text-xs uppercase tracking-widest font-medium">{t('common.waiting')}</span>
                  </div>
              )}
             
             <button 
+                onClick={() => setViewMode(prev => prev === 'canvas' ? 'video' : 'canvas')}
+                className="text-slate-300 hover:text-white bg-black/60 hover:bg-black/80 p-2 rounded-full backdrop-blur-md border border-white/10 transition-all shadow-lg"
+                title={viewMode === 'canvas' ? "Maximize Video" : "Show EMDR"}
+            >
+                {viewMode === 'canvas' ? <Video size={20} /> : <Activity size={20} />}
+            </button>
+
+            <button 
                 onClick={() => setShowSettingsMenu(true)}
                 className="text-slate-300 hover:text-white bg-black/60 hover:bg-black/80 p-2 rounded-full backdrop-blur-md border border-white/10 transition-all shadow-lg"
-                title="Settings"
+                title={t('common.settings')}
             >
                 <Settings2 size={20} />
             </button>
@@ -196,34 +215,145 @@ const ClientSession: React.FC = () => {
             <button 
                 onClick={toggleFullscreen}
                 className="text-slate-300 hover:text-white bg-black/60 hover:bg-black/80 p-2 rounded-full backdrop-blur-md border border-white/10 transition-all shadow-lg"
+                title="Toggle Fullscreen"
             >
                 {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
             </button>
         </div>
       </div>
       
-      {/* Settings Side Panel */}
       {showSettingsMenu && (
         <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-sm flex justify-end">
             <div className="w-80 h-full bg-slate-900 border-l border-slate-700 p-6 overflow-y-auto animate-in slide-in-from-right duration-300 shadow-2xl">
                 <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
                     <h2 className="text-white font-bold text-lg tracking-wide flex items-center gap-2">
-                        <Settings2 size={20} className="text-blue-500" /> Preferences
+                        <Settings2 size={20} className="text-blue-500" /> {t('client.preferences')}
                     </h2>
                     <button onClick={() => setShowSettingsMenu(false)} className="text-slate-400 hover:text-white"><X size={24} /></button>
                 </div>
-                {/* Simplified Controls for Brevity in this specific file update */}
-                <div className="space-y-4">
+
+                <div className="space-y-8">
                      <div className="p-4 bg-slate-800 rounded text-sm text-slate-300">
-                        Local adjustments (volume, colors) can be made here.
-                        Therapist controls (speed, motion) will override local settings.
+                        {t('client.localAdjust')}
                      </div>
+
+                    <section className="space-y-3">
+                        <div className="flex items-center gap-2 text-blue-400 font-medium text-sm uppercase tracking-wider">
+                            <Clock size={14} /> {t('controls.timer')}
+                        </div>
+                        <select
+                            value={settings.durationSeconds}
+                            onChange={(e) => updateSettings({ durationSeconds: Number(e.target.value) })}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-md p-2 text-white text-sm outline-none focus:border-blue-500"
+                        >
+                            <option value={0}>Infinite</option>
+                            <option value={30}>30s</option>
+                            <option value={60}>1m</option>
+                            <option value={120}>2m</option>
+                            <option value={300}>5m</option>
+                        </select>
+                    </section>
+
+                    <section className="space-y-4">
+                        <div className="flex items-center gap-2 text-blue-400 font-medium text-sm uppercase tracking-wider">
+                            <Sliders size={14} /> {t('controls.motion')}
+                        </div>
+                        
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm text-slate-300">
+                                <span>{t('controls.speed')}</span>
+                                <span>{settings.speed}</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="1"
+                                max="100"
+                                value={settings.speed}
+                                onChange={(e) => updateSettings({ speed: parseInt(e.target.value) })}
+                                className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm text-slate-300">
+                                <span>{t('controls.size')}</span>
+                                <span>{settings.size}px</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="10"
+                                max="150"
+                                value={settings.size}
+                                onChange={(e) => updateSettings({ size: parseInt(e.target.value) })}
+                                className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                            />
+                        </div>
+
+                         <div className="space-y-2">
+                            <label className="text-sm text-slate-300 block">{t('controls.pattern')}</label>
+                            <select 
+                                value={settings.pattern}
+                                onChange={handlePatternChange}
+                                className="w-full bg-slate-800 border border-slate-700 rounded-md p-2 text-white text-sm outline-none focus:border-blue-500"
+                            >
+                                <option value={MovementPattern.LINEAR}>{t('pattern.linear')}</option>
+                                <option value={MovementPattern.SINE}>{t('pattern.sine')}</option>
+                                <option value={MovementPattern.FIGURE_EIGHT}>{t('pattern.figure8')}</option>
+                                <option value={MovementPattern.VERTICAL}>{t('pattern.vertical')}</option>
+                                <option value={MovementPattern.ALTERNATED}>{t('pattern.alternated')}</option>
+                                <option value={MovementPattern.RANDOM}>{t('pattern.random')}</option>
+                            </select>
+                        </div>
+                    </section>
+
+                    <section className="space-y-4">
+                        <div className="flex items-center gap-2 text-blue-400 font-medium text-sm uppercase tracking-wider">
+                            {settings.soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />} {t('controls.audio')}
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm text-slate-300">{t('controls.sound')}</label>
+                            <button
+                                onClick={() => updateSettings({ soundEnabled: !settings.soundEnabled })}
+                                className={`w-10 h-5 rounded-full transition-colors relative ${settings.soundEnabled ? 'bg-blue-600' : 'bg-slate-700'}`}
+                            >
+                                <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${settings.soundEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                            </button>
+                        </div>
+
+                        <div className={`space-y-2 transition-opacity ${settings.soundEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                            <div className="flex justify-between text-sm text-slate-300">
+                                <span>{t('controls.volume')}</span>
+                                <span>{Math.round(settings.soundVolume * 100)}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={settings.soundVolume}
+                                onChange={(e) => updateSettings({ soundVolume: parseFloat(e.target.value) })}
+                                className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                            />
+                        </div>
+                    </section>
+
+                    {/* Language Switcher in Settings Panel */}
+                    <section className="space-y-4 pt-4 border-t border-slate-800">
+                        <div className="flex items-center gap-2 text-blue-400 font-medium text-sm uppercase tracking-wider">
+                            <Globe size={14} /> {t('common.language')}
+                        </div>
+                        <button 
+                            onClick={() => setLanguage(language === 'en' ? 'zh-TW' : 'en')}
+                            className="w-full py-2 bg-slate-800 hover:bg-slate-700 rounded text-sm text-white transition-colors"
+                        >
+                            {language === 'en' ? 'Switch to 繁體中文' : 'Switch to English'}
+                        </button>
+                    </section>
                 </div>
             </div>
         </div>
       )}
       
-      {/* Connected Indicator */}
       <div className="absolute bottom-4 right-4 z-40">
          <div className="w-2 h-2 rounded-full bg-green-500 opacity-50 shadow-[0_0_8px_rgba(34,197,94,0.8)]"></div>
       </div>

@@ -1,176 +1,224 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ClientStatus, EMDRSettings } from '../types';
-import { Eye, EyeOff, Video } from 'lucide-react';
+import { Eye, EyeOff, Video, Activity, AlertTriangle } from 'lucide-react';
 
 interface EyeTrackerProps {
   settings: EMDRSettings;
   onStatusChange: (status: ClientStatus) => void;
 }
 
+// Define globals for the CDN scripts loaded in index.html
+declare global {
+  interface Window {
+    FaceMesh: any;
+    Camera: any;
+  }
+}
+
 const EyeTracker: React.FC<EyeTrackerProps> = ({ settings, onStatusChange }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isActive, setIsActive] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [permissionDenied, setPermissionDenied] = useState(false);
   
-  // Refs for loop logic to avoid re-renders
-  const prevFrameDataRef = useRef<Uint8ClampedArray | null>(null);
+  // Logic Refs
+  const faceMeshRef = useRef<any>(null);
+  const cameraRef = useRef<any>(null);
+  const prevLandmarksRef = useRef<any[] | null>(null);
   const consecutiveFrozenFramesRef = useRef(0);
   const lastReportTimeRef = useRef(0);
-  
+  const lowConfidenceFramesRef = useRef(0);
+
   useEffect(() => {
-    const startCamera = async () => {
+    let isMounted = true;
+
+    const initMediaPipe = async () => {
+      // Ensure libraries are loaded from index.html
+      if (!window.FaceMesh || !window.Camera) {
+        console.error("MediaPipe libraries not found. Ensure scripts are in index.html");
+        setIsInitializing(false);
+        return;
+      }
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                width: { ideal: 320 }, 
-                height: { ideal: 240 },
-                frameRate: { ideal: 15 }
-            } 
+        const faceMesh = new window.FaceMesh({
+            locateFile: (file: string) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+            }
         });
-        
+
+        faceMesh.setOptions({
+            maxNumFaces: 1,
+            refineLandmarks: true, // Critical for Iris tracking (Points 468-477)
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        faceMesh.onResults(onResults);
+        faceMeshRef.current = faceMesh;
+
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-          setIsActive(true);
+            // CameraUtils handles the loop: getUserMedia -> requestAnimationFrame -> faceMesh.send()
+            const camera = new window.Camera(videoRef.current, {
+                onFrame: async () => {
+                    if (faceMeshRef.current && videoRef.current) {
+                        await faceMeshRef.current.send({ image: videoRef.current });
+                    }
+                },
+                width: 320, // Low res is sufficient for stability tracking and saves CPU
+                height: 240
+            });
+            cameraRef.current = camera;
+            await camera.start();
+            
+            if (isMounted) {
+                setIsActive(true);
+                setIsInitializing(false);
+            }
         }
       } catch (err) {
-        console.error("Error accessing webcam:", err);
-        setPermissionDenied(true);
-        onStatusChange({
-            isCameraActive: false,
-            isFrozen: false,
-            motionScore: 0,
-            lastUpdate: Date.now()
-        });
+        console.error("Error initializing EyeTracker:", err);
+        if (isMounted) {
+            setPermissionDenied(true);
+            setIsInitializing(false);
+        }
       }
     };
 
-    startCamera();
+    initMediaPipe();
 
     return () => {
-      // Cleanup stream
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
-      }
+      isMounted = false;
+      if (cameraRef.current) cameraRef.current.stop();
+      if (faceMeshRef.current) faceMeshRef.current.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!isActive) return;
-
-    let animationFrameId: number;
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    
-    if (!canvas || !video) return;
-    
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    
-    const processFrame = () => {
-      if (video.readyState === video.HAVE_ENOUGH_DATA && ctx) {
-        // Downscale for performance
-        const width = 64;
-        const height = 48;
+  const onResults = (results: any) => {
+    // 1. Detection Check
+    if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+        lowConfidenceFramesRef.current += 1;
         
-        if (canvas.width !== width) canvas.width = width;
-        if (canvas.height !== height) canvas.height = height;
-
-        // Draw current video frame
-        ctx.drawImage(video, 0, 0, width, height);
-        
-        // Get pixel data
-        const frameData = ctx.getImageData(0, 0, width, height).data;
-        
-        // Compare with previous frame
-        if (prevFrameDataRef.current) {
-            let diffSum = 0;
-            // Sample pixels (every 4th pixel to save CPU)
-            for (let i = 0; i < frameData.length; i += 16) {
-                // Just check Green channel for simple brightness/motion diff
-                const diff = Math.abs(frameData[i] - prevFrameDataRef.current[i]);
-                diffSum += diff;
-            }
-
-            // Normalize score (0-100 roughly)
-            // Max diff per pixel is 255. We checked frameData.length / 16 pixels.
-            const pixelsChecked = frameData.length / 16;
-            const averageDiff = diffSum / pixelsChecked;
-            
-            // Thresholds
-            // High averageDiff means lots of movement.
-            // Low averageDiff means stillness.
-            const motionScore = Math.min(100, averageDiff * 5); 
-            
-            // Freeze Sensitivity Calculation
-            // Sensitivity 0 (Strict) -> Threshold ~0.5 (Needs extreme stillness to be "Frozen")
-            // Sensitivity 100 (Sensitive) -> Threshold ~5.5 (Easier to be considered "Frozen")
-            const sensitivity = settings.freezeSensitivity ?? 50;
-            const FREEZE_THRESHOLD = 0.5 + (sensitivity / 100) * 5.0;
-            
-            if (motionScore < FREEZE_THRESHOLD) {
-                consecutiveFrozenFramesRef.current += 1;
-            } else {
-                consecutiveFrozenFramesRef.current = 0;
-            }
-
-            // If frozen for approx 2 seconds (assuming 15-30fps processing)
-            // We use a counter threshold. 30 frames ~ 1-2 seconds.
-            const isFrozen = consecutiveFrozenFramesRef.current > 30;
-
-            // Report status (throttle to every 500ms to save broadcast bandwidth)
-            const now = Date.now();
-            if (now - lastReportTimeRef.current > 500) {
+        // If face lost for ~2 seconds (approx 30 frames depending on device speed)
+        if (lowConfidenceFramesRef.current > 30) {
+             const now = Date.now();
+             // If previously active, report inactive
+             if (now - lastReportTimeRef.current > 1000) {
                 onStatusChange({
                     isCameraActive: true,
-                    isFrozen,
-                    motionScore,
+                    isFrozen: false, // Cannot determine frozen if face not seen
+                    motionScore: 0,
                     lastUpdate: now
                 });
                 lastReportTimeRef.current = now;
-            }
+             }
         }
+        return;
+    }
 
-        // Save current frame for next comparison
-        // We must copy it, otherwise we reference the same buffer
-        prevFrameDataRef.current = new Uint8ClampedArray(frameData);
-      }
+    // Face detected
+    lowConfidenceFramesRef.current = 0;
+    const landmarks = results.multiFaceLandmarks[0];
+    
+    // 2. Stability Calculation
+    // We track specific keypoints to determine "Freeze" vs "Motion"
+    // 1: Nose Tip (Head movement)
+    // 468: Left Iris Center
+    // 473: Right Iris Center
+    // 33: Left Eye Corner
+    // 263: Right Eye Corner
+    const keyPoints = [1, 468, 473, 33, 263];
+    let movementSum = 0;
 
-      animationFrameId = requestAnimationFrame(processFrame);
-    };
+    if (prevLandmarksRef.current) {
+        keyPoints.forEach(index => {
+            const curr = landmarks[index];
+            const prev = prevLandmarksRef.current![index];
+            
+            // Euclidean distance between frames for this point
+            // Note: Landmarks are normalized (0.0 - 1.0)
+            const dx = curr.x - prev.x;
+            const dy = curr.y - prev.y;
+            const dz = curr.z - prev.z; // Depth is rough but useful
+            movementSum += Math.sqrt(dx*dx + dy*dy + dz*dz);
+        });
+    }
 
-    animationFrameId = requestAnimationFrame(processFrame);
+    // Update history
+    prevLandmarksRef.current = landmarks;
 
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [isActive, onStatusChange, settings.freezeSensitivity]);
+    // 3. Score Normalization
+    // Average movement per keypoint
+    const avgMovement = movementSum / keyPoints.length;
+    
+    // Convert normalized float to a readable score (0-100)
+    // Typical "Still" noise is ~0.0005. Active eye movement is > 0.005.
+    // We multiply by 10000 to scale it up.
+    const rawScore = avgMovement * 10000; 
+    const motionScore = Math.min(100, rawScore);
 
-  if (permissionDenied) {
-      return null;
-  }
+    // 4. Freeze Threshold Logic
+    // settings.freezeSensitivity: 0 (Strict/Hard to freeze) to 100 (Sensitive/Easy to freeze)
+    const sensitivity = settings.freezeSensitivity ?? 50;
+    
+    // If sensitivity is High (100), we allow larger movements to still count as "Frozen" (Threshold higher)
+    // If sensitivity is Low (0), we need absolute stillness (Threshold lower)
+    const FREEZE_THRESHOLD = 2.0 + (sensitivity / 100) * 15.0;
+
+    if (rawScore < FREEZE_THRESHOLD) {
+        consecutiveFrozenFramesRef.current += 1;
+    } else {
+        consecutiveFrozenFramesRef.current = 0;
+    }
+
+    // Trigger frozen state if stillness persists for roughly 2 seconds
+    // Depending on FPS, 30-60 frames.
+    const isFrozen = consecutiveFrozenFramesRef.current > 45;
+
+    const now = Date.now();
+    // Report status (throttle to 500ms)
+    if (now - lastReportTimeRef.current > 500) {
+        onStatusChange({
+            isCameraActive: true,
+            isFrozen,
+            motionScore,
+            lastUpdate: now
+        });
+        lastReportTimeRef.current = now;
+    }
+  };
+
+  if (permissionDenied) return null;
 
   return (
-    <div className="fixed top-4 right-20 z-50 opacity-50 hover:opacity-100 transition-opacity">
-       <div className="bg-slate-900/80 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2">
-           {isActive ? (
+    <div className="fixed top-4 right-20 z-50 transition-opacity">
+       <div className={`backdrop-blur-md border rounded-full px-3 py-1 flex items-center gap-2 transition-colors ${isActive ? 'bg-slate-900/60 border-slate-700' : 'bg-red-900/40 border-red-700'}`}>
+           {isInitializing ? (
+               <>
+                <div className="w-3 h-3 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-[10px] text-slate-400 font-mono">Loading FaceMesh...</span>
+               </>
+           ) : isActive ? (
                <>
                 <div className="relative">
-                    <Video size={14} className="text-green-400" />
-                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    <Activity size={14} className="text-blue-400" />
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
                 </div>
-                <span className="text-[10px] text-slate-300 uppercase font-mono">Sensor Active</span>
+                <div className="flex flex-col leading-none">
+                    <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">AI Monitor</span>
+                    <span className="text-[8px] text-slate-500">Active</span>
+                </div>
                </>
            ) : (
                <>
-                <EyeOff size={14} className="text-slate-500" />
-                <span className="text-[10px] text-slate-500 uppercase font-mono">Initializing...</span>
+                <AlertTriangle size={14} className="text-red-400" />
+                <span className="text-[10px] text-red-300 font-mono">Cam Error</span>
                </>
            )}
        </div>
-       {/* Hidden processing elements */}
+       {/* The video element is utilized by MediaPipe CameraUtils but hidden from view */}
        <video ref={videoRef} className="hidden" playsInline muted />
-       <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 };
