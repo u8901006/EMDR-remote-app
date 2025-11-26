@@ -16,6 +16,9 @@ const TherapistSession: React.FC = () => {
   // View Mode: 'canvas' (Default, EMDR Focus) vs 'video' (Client Focus)
   const [viewMode, setViewMode] = useState<'canvas' | 'video'>('canvas');
   
+  // Store the latest AI summary for the report
+  const [latestSummary, setLatestSummary] = useState<string>('');
+  
   // Ref to control AI Assistant from other components
   const aiAssistantRef = useRef<AIAssistantHandle>(null);
 
@@ -28,6 +31,17 @@ const TherapistSession: React.FC = () => {
         aiAssistantRef.current.triggerPrompt(text, 'summary');
     }
   };
+  
+  const handleAIResponse = (text: string, mode: 'chat' | 'summary') => {
+      if (mode === 'summary') {
+          setLatestSummary(text);
+      }
+  };
+
+  const handleSessionComplete = () => {
+      // Called when passes or time runs out
+      updateSettings({ isPlaying: false });
+  };
 
   return (
     <div className="flex h-screen w-screen bg-slate-950 overflow-hidden">
@@ -37,6 +51,7 @@ const TherapistSession: React.FC = () => {
             settings={settings} 
             updateSettings={updateSettings} 
             onRequestSummary={handleRequestSummary}
+            latestSummary={latestSummary}
         />
       </div>
 
@@ -84,7 +99,11 @@ const TherapistSession: React.FC = () => {
                 onClick={() => viewMode === 'video' && setViewMode('canvas')}
                 title={viewMode === 'video' ? "Click to Maximize Canvas" : undefined}
              >
-                <EMDRCanvas settings={settings} role={SessionRole.THERAPIST} />
+                <EMDRCanvas 
+                    settings={settings} 
+                    role={SessionRole.THERAPIST} 
+                    onSessionComplete={handleSessionComplete}
+                />
                 
                 {/* Frozen Overlay for Canvas */}
                 {clientStatus?.isFrozen && viewMode === 'canvas' && (
@@ -125,7 +144,7 @@ const TherapistSession: React.FC = () => {
       </div>
 
       {/* AI Assistant Overlay */}
-      <AIAssistant ref={aiAssistantRef} />
+      <AIAssistant ref={aiAssistantRef} onResponseGenerated={handleAIResponse} />
     </div>
   );
 };

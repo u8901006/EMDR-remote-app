@@ -4,16 +4,27 @@ import { EMDRSettings, MovementPattern, SessionRole } from '../types';
 interface EMDRCanvasProps {
   settings: EMDRSettings;
   role: SessionRole;
+  onSessionComplete?: () => void;
 }
 
-const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role }) => {
+const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComplete }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(0);
   const timeRef = useRef<number>(0);
   
+  // Logic Refs
+  const currentPassesRef = useRef<number>(0);
+
   // Audio Context Refs
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevCosRef = useRef<number>(0); // Tracks the derivative to detect peaks
+
+  // Reset pass counter when playback starts
+  useEffect(() => {
+    if (settings.isPlaying) {
+      currentPassesRef.current = 0;
+    }
+  }, [settings.isPlaying]);
 
   // Initialize Audio Context
   useEffect(() => {
@@ -142,6 +153,15 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role }) => {
     else if (prevCos < 0 && cosT >= 0) {
         playTone(-1);
         triggerHaptics('left');
+        
+        // Pass Counting Logic
+        // We increment the count when completing a cycle (returning to Left)
+        if (settings.targetPasses > 0) {
+            currentPassesRef.current += 1;
+            if (currentPassesRef.current >= settings.targetPasses) {
+                if (onSessionComplete) onSessionComplete();
+            }
+        }
     }
     prevCosRef.current = cosT;
 

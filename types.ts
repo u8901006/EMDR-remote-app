@@ -32,7 +32,8 @@ export interface EMDRSettings {
   therapistVibrationEnabled: boolean;
   clientVibrationEnabled: boolean;
 
-  durationSeconds: number; // 0 for infinite
+  durationSeconds: number; // 0 for infinite (Manual/Passes mode)
+  targetPasses: number; // 0 for infinite (Manual/Timer mode)
   freezeSensitivity: number; // 0-100
   
   // LiveKit Configuration

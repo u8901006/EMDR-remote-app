@@ -36,6 +36,11 @@ export const translations: Record<Language, any> = {
     "controls.clientToken": "Client Token (Share this)",
     "controls.copyLink": "Copy Invite Link",
     "controls.linkCopied": "Copied!",
+    "controls.mode": "Termination Mode",
+    "controls.mode.manual": "Manual",
+    "controls.mode.time": "Timer",
+    "controls.mode.passes": "Passes (Cycles)",
+    "controls.passes": "Target Cycles",
     "controls.timer": "Timer",
     "controls.motion": "Motion",
     "controls.speed": "Speed",
@@ -64,7 +69,7 @@ export const translations: Record<Language, any> = {
     "presets.delete": "Delete",
     "presets.create": "Create New",
 
-    // Transcription
+    // Transcription & Report
     "transcription.title": "Transcription & Notes",
     "transcription.start": "Start Recording",
     "transcription.stop": "Stop Recording",
@@ -72,6 +77,14 @@ export const translations: Record<Language, any> = {
     "transcription.placeholder": "Real-time session transcript will appear here...",
     "transcription.generateSoap": "Generate SOAP Note",
     "transcription.unsupported": "Browser Not Supported",
+    "report.download": "Download Report",
+    "report.title": "MindSync Clinical Session Report",
+    "report.date": "Date",
+    "report.duration": "Session Duration",
+    "report.freezeCount": "Dissociation/Freeze Events",
+    "report.transcript": "Transcript",
+    "report.soap": "Clinical Summary (SOAP)",
+    "report.generated": "Report generated via MindSync EMDR",
     
     // Patterns
     "pattern.linear": "Linear",
@@ -135,7 +148,12 @@ export const translations: Record<Language, any> = {
     "controls.clientToken": "個案金鑰 (分享此金鑰)",
     "controls.copyLink": "複製邀請連結",
     "controls.linkCopied": "已複製！",
-    "controls.timer": "計時器",
+    "controls.mode": "停止模式",
+    "controls.mode.manual": "手動停止",
+    "controls.mode.time": "計時器",
+    "controls.mode.passes": "次數控制 (週期)",
+    "controls.passes": "目標次數",
+    "controls.timer": "時間",
     "controls.motion": "動態設定",
     "controls.speed": "速度",
     "controls.size": "大小",
@@ -163,7 +181,7 @@ export const translations: Record<Language, any> = {
     "presets.delete": "刪除",
     "presets.create": "建立新設定",
 
-    // Transcription
+    // Transcription & Report
     "transcription.title": "語音轉錄與筆記",
     "transcription.start": "開始錄音",
     "transcription.stop": "停止錄音",
@@ -171,6 +189,14 @@ export const translations: Record<Language, any> = {
     "transcription.placeholder": "即時療程對話將顯示於此...",
     "transcription.generateSoap": "生成 SOAP 臨床筆記",
     "transcription.unsupported": "瀏覽器不支援",
+    "report.download": "下載療程報告",
+    "report.title": "MindSync 臨床療程報告",
+    "report.date": "日期",
+    "report.duration": "療程總時長",
+    "report.freezeCount": "解離/凍結反應次數",
+    "report.transcript": "療程逐字稿",
+    "report.soap": "臨床摘要 (SOAP)",
+    "report.generated": "本報告由 MindSync EMDR 生成",
 
     // Patterns
     "pattern.linear": "水平移動 (Linear)",

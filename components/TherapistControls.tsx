@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { EMDRSettings, MovementPattern } from '../types';
-import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box } from 'lucide-react';
+import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat } from 'lucide-react';
 import { PRESET_COLORS, PRESET_BG_COLORS } from '../constants';
 import { useBroadcastSession } from '../hooks/useBroadcastSession';
 import { SessionRole } from '../types';
@@ -12,6 +12,7 @@ interface TherapistControlsProps {
   settings: EMDRSettings;
   updateSettings: (settings: Partial<EMDRSettings>) => void;
   onRequestSummary: (text: string) => void;
+  latestSummary?: string; // Generated AI summary passed down from parent
 }
 
 interface SavedPreset {
@@ -20,9 +21,11 @@ interface SavedPreset {
   settings: Partial<EMDRSettings>;
 }
 
-const PRESET_DURATIONS = [0, 30, 60, 120, 300, 600];
+const PRESET_DURATIONS = [30, 60, 120, 300, 600];
 
-const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateSettings, onRequestSummary }) => {
+type TerminationMode = 'MANUAL' | 'TIMER' | 'PASSES';
+
+const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateSettings, onRequestSummary, latestSummary }) => {
   const { t, language, setLanguage } = useLanguage();
   const { clientStatus } = useBroadcastSession(SessionRole.THERAPIST);
   const { connect, disconnect, isConnecting, room } = useLiveKitContext();
@@ -42,6 +45,44 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   const [presets, setPresets] = useState<SavedPreset[]>([]);
   const [newPresetName, setNewPresetName] = useState('');
 
+  // Stats for Report
+  const sessionStartTime = useRef<number>(Date.now());
+  const [freezeCount, setFreezeCount] = useState(0);
+  const prevFrozenState = useRef(false);
+
+  // Termination Mode Logic
+  const [terminationMode, setTerminationMode] = useState<TerminationMode>('MANUAL');
+  
+  useEffect(() => {
+      // Determine mode from initial settings or external updates
+      if (settings.targetPasses > 0) {
+          setTerminationMode('PASSES');
+      } else if (settings.durationSeconds > 0) {
+          setTerminationMode('TIMER');
+      } else {
+          setTerminationMode('MANUAL');
+      }
+  }, [settings.targetPasses, settings.durationSeconds]);
+
+  const handleModeChange = (mode: TerminationMode) => {
+      setTerminationMode(mode);
+      if (mode === 'MANUAL') {
+          updateSettings({ durationSeconds: 0, targetPasses: 0 });
+      } else if (mode === 'TIMER') {
+          updateSettings({ durationSeconds: 60, targetPasses: 0 }); // Default 1 min
+      } else if (mode === 'PASSES') {
+          updateSettings({ durationSeconds: 0, targetPasses: 24 }); // Default 24 passes
+      }
+  };
+
+  // Track freeze events
+  useEffect(() => {
+      if (clientStatus?.isFrozen && !prevFrozenState.current) {
+          setFreezeCount(c => c + 1);
+      }
+      prevFrozenState.current = !!clientStatus?.isFrozen;
+  }, [clientStatus?.isFrozen]);
+
   // Load presets on mount
   useEffect(() => {
     const saved = localStorage.getItem('emdr-presets');
@@ -58,10 +99,8 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   useEffect(() => { setLocalTherapistToken(settings.liveKitTherapistToken); }, [settings.liveKitTherapistToken]);
   useEffect(() => { setLocalClientToken(settings.liveKitClientToken); }, [settings.liveKitClientToken]);
   
-  const isNonStandardDuration = !PRESET_DURATIONS.includes(settings.durationSeconds);
-  const [forceCustomInput, setForceCustomInput] = useState(false);
-  const showTimerInput = isNonStandardDuration || forceCustomInput;
-
+  const isNonStandardDuration = !PRESET_DURATIONS.includes(settings.durationSeconds) && settings.durationSeconds > 0;
+  
   const handleConnect = async () => {
     updateSettings({
         liveKitUrl: localLiveKitUrl,
@@ -143,6 +182,46 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
         }
     }
     if (!triggered) alert("No gamepad detected.");
+  };
+
+  const handleDownloadReport = () => {
+    const durationMs = Date.now() - sessionStartTime.current;
+    const durationMin = Math.floor(durationMs / 60000);
+    const durationSec = Math.floor((durationMs % 60000) / 1000);
+    const dateStr = new Date().toLocaleString(language === 'zh-TW' ? 'zh-TW' : 'en-US');
+
+    const reportContent = `
+==================================================
+${t('report.title')}
+==================================================
+
+${t('report.date')}: ${dateStr}
+${t('report.duration')}: ${durationMin}m ${durationSec}s
+${t('report.freezeCount')}: ${freezeCount}
+
+--------------------------------------------------
+${t('report.soap')}
+--------------------------------------------------
+${latestSummary || '(No summary generated)'}
+
+--------------------------------------------------
+${t('report.transcript')}
+--------------------------------------------------
+${transcript || '(No transcript recorded)'}
+
+==================================================
+${t('report.generated')}
+`;
+
+    const blob = new Blob([reportContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MindSync-Session-${new Date().toISOString().slice(0,10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -263,13 +342,23 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
                                 className="w-full h-32 bg-slate-950 border border-slate-700 rounded p-2 text-xs text-slate-300 resize-none outline-none focus:border-blue-500/50 font-mono leading-relaxed"
                             />
 
-                            <button 
-                                onClick={() => onRequestSummary(transcript)}
-                                disabled={!transcript || transcript.length < 10}
-                                className="w-full py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-xs font-bold rounded flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20"
-                            >
-                                <Sparkles size={12} /> {t('transcription.generateSoap')}
-                            </button>
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => onRequestSummary(transcript)}
+                                    disabled={!transcript || transcript.length < 10}
+                                    className="flex-1 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-xs font-bold rounded flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20"
+                                >
+                                    <Sparkles size={12} /> {t('transcription.generateSoap')}
+                                </button>
+                                
+                                <button 
+                                    onClick={handleDownloadReport}
+                                    className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded flex items-center justify-center gap-2 transition-colors"
+                                    title={t('report.download')}
+                                >
+                                    <FileDown size={14} />
+                                </button>
+                            </div>
                         </>
                      )}
                 </div>
@@ -418,39 +507,83 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
 
         {/* Playback Controls */}
         <section className="space-y-3">
-             <div className="flex items-center justify-between">
+             <div className="flex items-center justify-between mb-2">
                  <div className="flex items-center gap-2 text-blue-400 font-medium text-sm uppercase tracking-wider">
-                    <Clock size={14} /> {t('controls.timer')}
+                    <Clock size={14} /> {t('controls.mode')}
                  </div>
-                 <div className="flex items-center gap-2">
-                     {showTimerInput && (
+             </div>
+             
+             {/* Termination Mode Switcher */}
+             <div className="flex p-1 bg-slate-800 rounded-lg">
+                 {(['MANUAL', 'TIMER', 'PASSES'] as TerminationMode[]).map(mode => (
+                     <button
+                        key={mode}
+                        onClick={() => handleModeChange(mode)}
+                        className={`flex-1 py-1.5 text-[10px] font-bold rounded transition-colors ${
+                            terminationMode === mode 
+                            ? 'bg-blue-600 text-white shadow' 
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                     >
+                        {mode === 'MANUAL' && t('controls.mode.manual')}
+                        {mode === 'TIMER' && t('controls.mode.time')}
+                        {mode === 'PASSES' && t('controls.mode.passes')}
+                     </button>
+                 ))}
+             </div>
+
+             {/* Dynamic Input based on Mode */}
+             {terminationMode === 'TIMER' && (
+                 <div className="animate-in fade-in slide-in-from-top-1 bg-slate-800/30 p-2 rounded border border-slate-700/30">
+                     <div className="flex justify-between items-center text-xs text-slate-300 mb-1">
+                         <span>{t('controls.timer')}</span>
+                         <span>{settings.durationSeconds}s</span>
+                     </div>
+                     <div className="flex gap-2">
+                         <select
+                            value={PRESET_DURATIONS.includes(settings.durationSeconds) ? settings.durationSeconds : -1}
+                            onChange={(e) => {
+                                const val = Number(e.target.value);
+                                if (val !== -1) updateSettings({ durationSeconds: val });
+                            }}
+                            className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs outline-none"
+                         >
+                            {PRESET_DURATIONS.map(d => <option key={d} value={d}>{d}s</option>)}
+                            <option value={-1}>Custom</option>
+                         </select>
+                         <input
+                            type="number"
+                            min="1"
+                            value={settings.durationSeconds || ''}
+                            onChange={(e) => updateSettings({ durationSeconds: Math.max(1, parseInt(e.target.value) || 0) })}
+                            className="w-16 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-right outline-none"
+                            placeholder="Sec"
+                        />
+                     </div>
+                 </div>
+             )}
+
+             {terminationMode === 'PASSES' && (
+                 <div className="animate-in fade-in slide-in-from-top-1 bg-slate-800/30 p-2 rounded border border-slate-700/30">
+                     <div className="flex justify-between items-center text-xs text-slate-300 mb-1">
+                         <span>{t('controls.passes')}</span>
+                         <span>{settings.targetPasses}</span>
+                     </div>
+                     <div className="flex items-center gap-2">
+                        <Repeat size={14} className="text-slate-500" />
                         <input
                             type="number"
                             min="1"
-                            value={settings.durationSeconds}
-                            onChange={(e) => updateSettings({ durationSeconds: Math.max(1, parseInt(e.target.value) || 0) })}
-                            className="w-12 bg-slate-950 border border-slate-700 rounded px-1 py-1 text-xs text-right"
+                            max="1000"
+                            value={settings.targetPasses || ''}
+                            onChange={(e) => updateSettings({ targetPasses: Math.max(1, parseInt(e.target.value) || 0) })}
+                            className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs outline-none"
                         />
-                     )}
-                     <select
-                        value={showTimerInput ? -1 : settings.durationSeconds}
-                        onChange={(e) => {
-                            const val = Number(e.target.value);
-                            val === -1 ? setForceCustomInput(true) : setForceCustomInput(false);
-                            updateSettings({ durationSeconds: val === -1 ? 45 : val });
-                        }}
-                        className="bg-slate-800 border border-slate-700 px-2 py-1 text-xs rounded outline-none"
-                     >
-                        <option value={0}>Infinite</option>
-                        <option value={30}>30s</option>
-                        <option value={60}>1m</option>
-                        <option value={300}>5m</option>
-                        <option value={-1}>Custom</option>
-                     </select>
+                     </div>
                  </div>
-            </div>
+             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 pt-2">
                 <button
                     onClick={() => updateSettings({ isPlaying: !settings.isPlaying })}
                     className={`flex items-center justify-center gap-2 p-4 rounded-lg font-semibold transition-all ${

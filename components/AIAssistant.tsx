@@ -8,7 +8,11 @@ export interface AIAssistantHandle {
     triggerPrompt: (text: string, mode?: 'chat' | 'summary') => void;
 }
 
-const AIAssistant = forwardRef<AIAssistantHandle>((props, ref) => {
+interface AIAssistantProps {
+    onResponseGenerated?: (text: string, mode: 'chat' | 'summary') => void;
+}
+
+const AIAssistant = forwardRef<AIAssistantHandle, AIAssistantProps>((props, ref) => {
   const { t, language } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
@@ -16,6 +20,9 @@ const AIAssistant = forwardRef<AIAssistantHandle>((props, ref) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Track the intention of the current request to pass correct mode to callback
+  const pendingRequestMode = useRef<'chat' | 'summary'>('chat');
 
   useEffect(() => {
     setMessages([
@@ -65,6 +72,7 @@ const AIAssistant = forwardRef<AIAssistantHandle>((props, ref) => {
         };
         setMessages(prev => [...prev, aiMsg]);
         setInputMode('chat');
+        if (props.onResponseGenerated) props.onResponseGenerated(responseText, 'chat');
     } else {
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
@@ -83,6 +91,12 @@ const AIAssistant = forwardRef<AIAssistantHandle>((props, ref) => {
             timestamp: new Date()
         };
         setMessages(prev => [...prev, aiMsg]);
+        
+        if (props.onResponseGenerated) {
+            props.onResponseGenerated(responseText, pendingRequestMode.current);
+        }
+        // Reset mode
+        pendingRequestMode.current = 'chat';
     }
     
     setIsLoading(false);
@@ -91,6 +105,7 @@ const AIAssistant = forwardRef<AIAssistantHandle>((props, ref) => {
   // Expose methods to parent
   useImperativeHandle(ref, () => ({
       triggerPrompt: (text: string, mode: 'chat' | 'summary' = 'chat') => {
+          pendingRequestMode.current = mode;
           if (mode === 'summary') {
               const summaryPrompt = language === 'zh-TW' 
                 ? `請根據以下療程逐字稿，生成一份專業的 SOAP 臨床筆記 (Subjective, Objective, Assessment, Plan)：\n\n${text}`
@@ -178,7 +193,10 @@ const AIAssistant = forwardRef<AIAssistantHandle>((props, ref) => {
                     <User size={12} /> {t('ai.btn.safeplace')}
                 </button>
                 <button 
-                    onClick={() => setInput(language === 'zh-TW' ? "請總結本次療程關於童年創傷的重點。" : "Summarize the key themes from a session focusing on childhood trauma.")}
+                    onClick={() => {
+                        pendingRequestMode.current = 'summary';
+                        setInput(language === 'zh-TW' ? "請總結本次療程關於童年創傷的重點。" : "Summarize the key themes from a session focusing on childhood trauma.");
+                    }}
                     className="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-full whitespace-nowrap flex items-center gap-1 transition-colors"
                 >
                     <FileText size={12} /> {t('ai.btn.notes')}

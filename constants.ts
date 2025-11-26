@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: EMDRSettings = {
   clientVibrationEnabled: false,
 
   durationSeconds: 0,
+  targetPasses: 0,
   freezeSensitivity: 50,
   liveKitUrl: '',
   liveKitTherapistToken: '',

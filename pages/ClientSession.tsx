@@ -107,6 +107,14 @@ const ClientSession: React.FC = () => {
     updateSettings({ pattern: e.target.value as MovementPattern });
   };
 
+  // Only handle local stop if NOT connected to a therapist (Standalone mode)
+  // If connected, we rely on the therapist to stop the session via broadcast
+  const handleSessionComplete = () => {
+      if (!room) {
+          updateSettings({ isPlaying: false });
+      }
+  };
+
   if (!room) {
       return (
         <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
@@ -227,7 +235,11 @@ const ClientSession: React.FC = () => {
         }}
         title={viewMode === 'video' ? "Click to Maximize EMDR" : undefined}
       >
-         <EMDRCanvas settings={settings} role={SessionRole.CLIENT} />
+         <EMDRCanvas 
+            settings={settings} 
+            role={SessionRole.CLIENT} 
+            onSessionComplete={handleSessionComplete}
+         />
       </div>
 
       <div className={`transition-all duration-500 ease-in-out absolute ${
