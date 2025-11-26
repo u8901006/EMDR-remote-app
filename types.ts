@@ -24,6 +24,13 @@ export enum VisualTheme {
   CUSTOM_IMAGE = 'CUSTOM_IMAGE'
 }
 
+export enum AudioMode {
+  NONE = 'NONE',
+  BINAURAL = 'BINAURAL',
+  RAIN = 'RAIN',
+  OCEAN = 'OCEAN'
+}
+
 export type Language = 'en' | 'zh-TW';
 
 export type EmotionType = 'JOY' | 'SADNESS' | 'FEAR' | 'CALM';
@@ -50,6 +57,7 @@ export interface EMDRSettings {
   // Audio
   soundEnabled: boolean;
   soundVolume: number; // 0-1
+  audioMode: AudioMode; // Background sound layer
   
   // Haptics (Gamepad)
   therapistVibrationEnabled: boolean;

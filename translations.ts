@@ -52,6 +52,7 @@ export const translations: Record<Language, any> = {
     "controls.audio": "Audio",
     "controls.sound": "Enable Sound",
     "controls.volume": "Volume",
+    "controls.bgSound": "Background Sound",
     "controls.haptics": "Haptics",
     "controls.gamepad.therapist": "Therapist Gamepad",
     "controls.gamepad.client": "Client Gamepad",
@@ -63,6 +64,12 @@ export const translations: Record<Language, any> = {
     "controls.depth": "3D Depth",
     "controls.depthDesc": "Simulate distance change",
     
+    // Audio Modes
+    "audio.none": "None",
+    "audio.binaural": "Binaural Beats (Theta)",
+    "audio.rain": "Heavy Rain",
+    "audio.ocean": "Ocean Waves",
+
     // Emotions
     "emotion.calm": "Calm",
     "emotion.fear": "Fear/Anxiety",
@@ -211,6 +218,7 @@ export const translations: Record<Language, any> = {
     "controls.audio": "音效設定",
     "controls.sound": "開啟音效",
     "controls.volume": "音量",
+    "controls.bgSound": "背景音效",
     "controls.haptics": "觸覺回饋 (震動)",
     "controls.gamepad.therapist": "治療師手把",
     "controls.gamepad.client": "個案手把",
@@ -221,6 +229,12 @@ export const translations: Record<Language, any> = {
     "controls.bg": "背景顏色",
     "controls.depth": "3D 深度模擬",
     "controls.depthDesc": "模擬遠近距離變化",
+
+    // Audio Modes
+    "audio.none": "無",
+    "audio.binaural": "雙耳波差 (Theta)",
+    "audio.rain": "大雨聲 (Rain)",
+    "audio.ocean": "海浪聲 (Ocean)",
 
     // Emotions
     "emotion.calm": "平靜 (Calm)",

@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useState } from 'react';
-import { EMDRSettings, MovementPattern, SessionRole, VisualTheme } from '../types';
+import { EMDRSettings, MovementPattern, SessionRole, VisualTheme, AudioMode } from '../types';
 
 interface EMDRCanvasProps {
   settings: EMDRSettings;
@@ -26,6 +26,9 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
   // Audio Context Refs
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevCosRef = useRef<number>(0); // Tracks the derivative to detect peaks
+  
+  // Background Audio Nodes
+  const bgNodesRef = useRef<any[]>([]); // Keep track of active nodes to stop them
 
   // Visual Theme Refs
   const starsRef = useRef<Star[]>([]);
@@ -77,10 +80,132 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
         audioCtxRef.current = new AudioContextClass();
     }
     return () => {
+        stopBackgroundAudio();
         void audioCtxRef.current?.close();
         audioCtxRef.current = null;
     };
   }, []);
+
+  // --- Background Audio Engine ---
+
+  const stopBackgroundAudio = () => {
+    bgNodesRef.current.forEach(node => {
+        try {
+            if (node.stop) node.stop();
+            node.disconnect();
+        } catch (e) { /* ignore */ }
+    });
+    bgNodesRef.current = [];
+  };
+
+  const createNoiseBuffer = (ctx: AudioContext) => {
+    const bufferSize = 2 * ctx.sampleRate; // 2 seconds
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const output = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        // Pink noise approx:
+        const white = Math.random() * 2 - 1;
+        output[i] = (lastOut + (0.02 * white)) / 1.02;
+        lastOut = output[i];
+        output[i] *= 3.5; 
+    }
+    return buffer;
+  };
+  let lastOut = 0;
+
+  const startBackgroundAudio = () => {
+     if (!settings.soundEnabled || !audioCtxRef.current || settings.audioMode === AudioMode.NONE) {
+         stopBackgroundAudio();
+         return;
+     }
+
+     const ctx = audioCtxRef.current;
+     if (ctx.state === 'suspended') void ctx.resume();
+
+     stopBackgroundAudio(); // Clear previous
+
+     // Background Volume (usually slightly softer than BLS beeps)
+     const bgGain = ctx.createGain();
+     bgGain.gain.value = settings.soundVolume * 0.4; 
+     bgGain.connect(ctx.destination);
+     bgNodesRef.current.push(bgGain);
+
+     switch (settings.audioMode) {
+         case AudioMode.BINAURAL:
+             // Theta Waves (6Hz difference)
+             // Left: 200 Hz
+             const oscL = ctx.createOscillator();
+             oscL.type = 'sine';
+             oscL.frequency.value = 200;
+             const panL = ctx.createStereoPanner();
+             panL.pan.value = -1;
+             
+             // Right: 206 Hz
+             const oscR = ctx.createOscillator();
+             oscR.type = 'sine';
+             oscR.frequency.value = 206;
+             const panR = ctx.createStereoPanner();
+             panR.pan.value = 1;
+
+             oscL.connect(panL).connect(bgGain);
+             oscR.connect(panR).connect(bgGain);
+             
+             oscL.start();
+             oscR.start();
+             bgNodesRef.current.push(oscL, oscR, panL, panR);
+             break;
+
+         case AudioMode.RAIN:
+             // Pink Noise + High Pass Filter
+             const rainBuffer = createNoiseBuffer(ctx);
+             const rainSrc = ctx.createBufferSource();
+             rainSrc.buffer = rainBuffer;
+             rainSrc.loop = true;
+             
+             const rainFilter = ctx.createBiquadFilter();
+             rainFilter.type = 'highpass';
+             rainFilter.frequency.value = 800; // Remove muddy lows
+
+             rainSrc.connect(rainFilter).connect(bgGain);
+             rainSrc.start();
+             bgNodesRef.current.push(rainSrc, rainFilter);
+             break;
+
+         case AudioMode.OCEAN:
+             // Pink/Brown Noise + Modulated Low Pass Filter
+             const oceanBuffer = createNoiseBuffer(ctx);
+             const oceanSrc = ctx.createBufferSource();
+             oceanSrc.buffer = oceanBuffer;
+             oceanSrc.loop = true;
+
+             const oceanFilter = ctx.createBiquadFilter();
+             oceanFilter.type = 'lowpass';
+             oceanFilter.frequency.value = 400;
+
+             // LFO to modulate filter frequency (Waves)
+             const lfo = ctx.createOscillator();
+             lfo.type = 'sine';
+             lfo.frequency.value = 0.1; // 10 second wave cycle
+             
+             const lfoGain = ctx.createGain();
+             lfoGain.gain.value = 300; // Modulate freq by +/- 300Hz
+
+             lfo.connect(lfoGain).connect(oceanFilter.frequency);
+             
+             oceanSrc.connect(oceanFilter).connect(bgGain);
+             oceanSrc.start();
+             lfo.start();
+             bgNodesRef.current.push(oceanSrc, oceanFilter, lfo, lfoGain);
+             break;
+     }
+  };
+
+  // React to audio settings changes
+  useEffect(() => {
+     startBackgroundAudio();
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.soundEnabled, settings.audioMode, settings.soundVolume]);
+
 
   // Trigger Gamepad Vibration
   // Side: 'left' or 'right'
@@ -134,7 +259,7 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
     
     // Envelope for a soft "tick"
     gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(settings.soundVolume * 0.5, ctx.currentTime + 0.02); // Attack
+    gainNode.gain.linearRampToValueAtTime(settings.soundVolume * 0.8, ctx.currentTime + 0.02); // Attack (Louder than BG)
     gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15); // Decay
 
     panner.pan.value = pan;

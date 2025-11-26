@@ -1,5 +1,5 @@
 
-import { EMDRSettings, MovementPattern, VisualTheme } from './types';
+import { EMDRSettings, MovementPattern, VisualTheme, AudioMode } from './types';
 
 export const DEFAULT_SETTINGS: EMDRSettings = {
   isPlaying: false,
@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: EMDRSettings = {
 
   soundEnabled: false,
   soundVolume: 0.5,
+  audioMode: AudioMode.NONE,
   
   therapistVibrationEnabled: false,
   clientVibrationEnabled: false,
@@ -111,6 +112,17 @@ export const EMDR_SCRIPTS = [
     content: {
       en: `Bring to mind an image of yourself as a child, perhaps around the age the difficulty began.\n\nNow, imagine looking at that child through the eyes of someone who loves them unconditionally (a grandparent, a spiritual figure, or your current adult self).\n\nLook at that child with total acceptance and compassion.\n\nNotice how that child reacts to being seen with such love.\n\nAs you hold that connection, notice what you are feeling in your body.`,
       'zh-TW': `請在腦海中浮現您童年時的影像，或許是困難開始發生時的那個年紀。\n\n現在，想像透過一位無條件愛著這個孩子的人的眼睛來看著他（可以是祖父母、精神信仰的人物，或是現在成年的您自己）。\n\n帶著完全的接納與慈悲看著那個孩子。\n\n注意那個孩子在被如此慈愛的目光注視時，有什麼反應。\n\n當您保持這種連結時，注意您身體裡的感覺。`
+    }
+  },
+  {
+    id: 'bomb',
+    title: {
+      en: 'Resource Bombardment',
+      'zh-TW': '資源轟炸 (Resource Bombardment)'
+    },
+    content: {
+      en: `(Rapidly alternate between resources)\nThink of a time you felt STRONG. (Short BLS)\nNow think of a time you felt LOVED. (Short BLS)\nNow think of a time you felt PROUD. (Short BLS)\nNow think of a time you felt SAFE. (Short BLS)\n\nNow, I want you to bring ALL those feelings together at once. Strength, Love, Pride, Safety. Feel them all flooding your body right now.\n(Longer BLS)`,
+      'zh-TW': `(快速交替不同的資源)\n回想一個您感到「強壯」的時刻。(短暫雙側刺激)\n現在回想一個您感到「被愛」的時刻。(短暫雙側刺激)\n現在回想一個您感到「驕傲」的時刻。(短暫雙側刺激)\n現在回想一個您感到「安全」的時刻。(短暫雙側刺激)\n\n現在，我要您將這所有的感覺同時帶進來。強壯、被愛、驕傲、安全。感覺它們現在充滿您的全身。\n(較長的雙側刺激)`
     }
   }
 ];

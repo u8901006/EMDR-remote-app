@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { EMDRSettings, MovementPattern, VisualTheme, MetricType, SessionMetric, EmotionType } from '../types';
-import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp, Smile, Frown, Meh, AlertOctagon, BookOpen, MonitorUp, MonitorOff } from 'lucide-react';
+import { EMDRSettings, MovementPattern, VisualTheme, MetricType, SessionMetric, EmotionType, AudioMode } from '../types';
+import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp, Smile, Frown, Meh, AlertOctagon, BookOpen, MonitorUp, MonitorOff, Music } from 'lucide-react';
 import { PRESET_COLORS, PRESET_BG_COLORS, EMDR_SCRIPTS } from '../constants';
 import { useBroadcastSession } from '../hooks/useBroadcastSession';
 import { SessionRole } from '../types';
@@ -275,6 +275,10 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   
   const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       updateSettings({ theme: e.target.value as VisualTheme });
+  };
+
+  const handleAudioModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      updateSettings({ audioMode: e.target.value as AudioMode });
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1019,6 +1023,24 @@ ${t('report.generated')}
                         onChange={(e) => updateSettings({ soundVolume: parseFloat(e.target.value) })}
                         className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
                     />
+
+                    {/* Background Audio Selector */}
+                    <div className="pt-2">
+                        <label className="text-sm flex items-center gap-2 mb-1">
+                            <Music size={14} className="text-slate-400" />
+                            {t('controls.bgSound')}
+                        </label>
+                        <select 
+                            value={settings.audioMode} 
+                            onChange={(e) => updateSettings({ audioMode: e.target.value as AudioMode })} 
+                            className="w-full bg-slate-950 border border-slate-700 rounded-md p-2 text-white outline-none text-xs"
+                        >
+                            <option value={AudioMode.NONE}>{t('audio.none')}</option>
+                            <option value={AudioMode.BINAURAL}>{t('audio.binaural')}</option>
+                            <option value={AudioMode.RAIN}>{t('audio.rain')}</option>
+                            <option value={AudioMode.OCEAN}>{t('audio.ocean')}</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </section>

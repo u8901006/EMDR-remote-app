@@ -1,13 +1,11 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Maximize, Minimize, ArrowLeft, Loader2, Settings2, X, Clock, Sliders, Volume2, VolumeX, Gamepad2, Palette, Link as LinkIcon, AlertCircle, Globe, Video, Activity, ChevronDown, ChevronRight, Box, Image as ImageIcon, Upload, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Maximize, Minimize, ArrowLeft, Loader2, Settings2, X, Clock, Sliders, Volume2, VolumeX, Gamepad2, Palette, Link as LinkIcon, AlertCircle, Globe, Video, Activity, ChevronDown, ChevronRight, CheckCircle2, Music, Upload } from 'lucide-react';
 import EMDRCanvas from '../components/EMDRCanvas';
 import EyeTracker from '../components/EyeTracker';
 import LiveVideo from '../components/LiveVideo';
 import { useBroadcastSession } from '../hooks/useBroadcastSession';
-import { SessionRole, MovementPattern, VisualTheme } from '../types';
-import { PRESET_COLORS, PRESET_BG_COLORS } from '../constants';
+import { SessionRole, MovementPattern, VisualTheme, AudioMode } from '../types';
 import { useLiveKitContext } from '../contexts/LiveKitContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -117,6 +115,10 @@ const ClientSession: React.FC = () => {
   
   const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       updateSettings({ theme: e.target.value as VisualTheme });
+  };
+
+  const handleAudioModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      updateSettings({ audioMode: e.target.value as AudioMode });
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -246,60 +248,59 @@ const ClientSession: React.FC = () => {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black">
-      
-      {/* Metric Input Modal */}
-      {pendingMetricRequest && (
-          <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-              <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 max-w-lg w-full shadow-2xl space-y-8">
-                  <div className="text-center space-y-2">
-                      <h3 className="text-2xl font-bold text-white">
-                          {pendingMetricRequest === 'SUD' ? t('client.metric.sudsTitle') : t('client.metric.vocTitle')}
-                      </h3>
-                      <p className="text-slate-400">
-                          {pendingMetricRequest === 'SUD' ? t('client.metric.sudsDesc') : t('client.metric.vocDesc')}
-                      </p>
-                  </div>
-                  
-                  <div className="space-y-6">
-                      <div className="flex justify-center items-end gap-2">
-                          <span className="text-6xl font-bold text-blue-500 tabular-nums">{metricValue}</span>
-                          <span className="text-xl text-slate-500 mb-2">/ {pendingMetricRequest === 'SUD' ? 10 : 7}</span>
-                      </div>
-                      
-                      <input 
-                          type="range"
-                          min={pendingMetricRequest === 'SUD' ? 0 : 1}
-                          max={pendingMetricRequest === 'SUD' ? 10 : 7}
-                          step={1}
-                          value={metricValue}
-                          onChange={(e) => setMetricValue(parseInt(e.target.value))}
-                          className="w-full h-4 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-500"
-                      />
-                      
-                      <div className="flex justify-between text-xs text-slate-500 uppercase font-bold tracking-wider">
-                          <span>{pendingMetricRequest === 'SUD' ? 'Neutral (0)' : 'False (1)'}</span>
-                          <span>{pendingMetricRequest === 'SUD' ? 'Disturbing (10)' : 'True (7)'}</span>
-                      </div>
-                  </div>
+        {/* Metric Input Modal */}
+        {pendingMetricRequest && (
+            <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 max-w-lg w-full shadow-2xl space-y-8">
+                    <div className="text-center space-y-2">
+                        <h3 className="text-2xl font-bold text-white">
+                            {pendingMetricRequest === 'SUD' ? t('client.metric.sudsTitle') : t('client.metric.vocTitle')}
+                        </h3>
+                        <p className="text-slate-400">
+                            {pendingMetricRequest === 'SUD' ? t('client.metric.sudsDesc') : t('client.metric.vocDesc')}
+                        </p>
+                    </div>
+                    
+                    <div className="space-y-6">
+                        <div className="flex justify-center items-end gap-2">
+                            <span className="text-6xl font-bold text-blue-500 tabular-nums">{metricValue}</span>
+                            <span className="text-xl text-slate-500 mb-2">/ {pendingMetricRequest === 'SUD' ? 10 : 7}</span>
+                        </div>
+                        
+                        <input 
+                            type="range"
+                            min={pendingMetricRequest === 'SUD' ? 0 : 1}
+                            max={pendingMetricRequest === 'SUD' ? 10 : 7}
+                            step={1}
+                            value={metricValue}
+                            onChange={(e) => setMetricValue(parseInt(e.target.value))}
+                            className="w-full h-4 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-500"
+                        />
+                        
+                        <div className="flex justify-between text-xs text-slate-500 uppercase font-bold tracking-wider">
+                            <span>{pendingMetricRequest === 'SUD' ? 'Neutral (0)' : 'False (1)'}</span>
+                            <span>{pendingMetricRequest === 'SUD' ? 'Disturbing (10)' : 'True (7)'}</span>
+                        </div>
+                    </div>
 
-                  <div className="grid grid-cols-2 gap-4 pt-4">
-                        <button 
-                            onClick={() => setPendingMetricRequest(null)}
-                            className="py-3 px-6 rounded-xl border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors font-medium"
-                        >
-                            {t('common.cancel')}
-                        </button>
-                        <button 
-                            onClick={handleMetricSubmit}
-                            className="py-3 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 transition-all transform hover:scale-105 font-bold flex items-center justify-center gap-2"
-                        >
-                            <CheckCircle2 size={20} />
-                            {t('common.submit')}
-                        </button>
-                  </div>
-              </div>
-          </div>
-      )}
+                    <div className="grid grid-cols-2 gap-4 pt-4">
+                            <button 
+                                onClick={() => setPendingMetricRequest(null)}
+                                className="py-3 px-6 rounded-xl border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors font-medium"
+                            >
+                                {t('common.cancel')}
+                            </button>
+                            <button 
+                                onClick={handleMetricSubmit}
+                                className="py-3 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 transition-all transform hover:scale-105 font-bold flex items-center justify-center gap-2"
+                            >
+                                <CheckCircle2 size={20} />
+                                {t('common.submit')}
+                            </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
       <div 
         className={`transition-all duration-500 ease-in-out absolute ${
@@ -565,6 +566,23 @@ const ClientSession: React.FC = () => {
                                 onChange={(e) => updateSettings({ soundVolume: parseFloat(e.target.value) })}
                                 className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400"
                             />
+
+                            <div className="pt-2">
+                                <label className="text-sm flex items-center gap-2 mb-1">
+                                    <Music size={14} className="text-slate-400" />
+                                    {t('controls.bgSound')}
+                                </label>
+                                <select 
+                                    value={settings.audioMode} 
+                                    onChange={handleAudioModeChange} 
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-md p-2 text-white outline-none text-xs"
+                                >
+                                    <option value={AudioMode.NONE}>{t('audio.none')}</option>
+                                    <option value={AudioMode.BINAURAL}>{t('audio.binaural')}</option>
+                                    <option value={AudioMode.RAIN}>{t('audio.rain')}</option>
+                                    <option value={AudioMode.OCEAN}>{t('audio.ocean')}</option>
+                                </select>
+                            </div>
                         </div>
                     </section>
 
@@ -584,10 +602,6 @@ const ClientSession: React.FC = () => {
             </div>
         </div>
       )}
-      
-      <div className="absolute bottom-4 right-4 z-40 pointer-events-none">
-         <div className="w-2 h-2 rounded-full bg-green-500 opacity-50 shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse"></div>
-      </div>
     </div>
   );
 };
