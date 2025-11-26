@@ -1,3 +1,4 @@
+
 import { EMDRSettings, MovementPattern, VisualTheme } from './types';
 
 export const DEFAULT_SETTINGS: EMDRSettings = {
@@ -65,5 +66,15 @@ export const EMDR_SCRIPTS = [
     id: 'spiral',
     title: 'Spiral Technique (螺旋技術)',
     content: `Bring your attention to the disturbing sensation in your body.\n\nIf this feeling had a shape, what would it be? If it had a color, what would it be?\n\nImagine it spinning. Is it spinning clockwise or counter-clockwise?\n\nNow, I want you to gently reverse the direction of the spin. Watch it slow down, stop, and start spinning in the opposite direction.\n\nNotice what happens to the color and the intensity as it spins the other way.`
+  },
+  {
+    id: 'flash',
+    title: 'Flash Technique (閃光技術)',
+    content: `Identify a Positive Engaging Focus (PEF). This should be something that captures your interest and brings you joy or calm (e.g., a hobby, a vacation spot, a favorite song).\n\nFocus entirely on that PEF. Describe it to me.\n\n(While client focuses on PEF)\n\nNow, when I say 'Flash', I want you to blink your eyes rapidly 3 times, briefly touching on the disturbance, and then immediately return your focus to the PEF.\n\nReady? ... FLASH (Blink, Blink, Blink).\n\nGood. Go right back to the PEF. What are you noticing about it now?`
+  },
+  {
+    id: 'loving_eyes',
+    title: 'Loving Eyes Procedure (慈愛眼神)',
+    content: `Bring to mind an image of yourself as a child, perhaps around the age the difficulty began.\n\nNow, imagine looking at that child through the eyes of someone who loves them unconditionally (a grandparent, a spiritual figure, or your current adult self).\n\nLook at that child with total acceptance and compassion.\n\nNotice how that child reacts to being seen with such love.\n\nAs you hold that connection, notice what you are feeling in your body.`
   }
 ];
