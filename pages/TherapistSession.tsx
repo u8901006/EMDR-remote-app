@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, AlertTriangle, Maximize2, Minimize2, Video, Activity } from 'lucide-react';
@@ -19,6 +20,9 @@ const TherapistSession: React.FC = () => {
   // Store the latest AI summary for the report
   const [latestSummary, setLatestSummary] = useState<string>('');
   
+  // Teleprompter State
+  const [teleprompterText, setTeleprompterText] = useState<string | null>(null);
+
   // Ref to control AI Assistant from other components
   const aiAssistantRef = useRef<AIAssistantHandle>(null);
 
@@ -52,6 +56,7 @@ const TherapistSession: React.FC = () => {
             updateSettings={updateSettings} 
             onRequestSummary={handleRequestSummary}
             latestSummary={latestSummary}
+            onUpdateTeleprompter={setTeleprompterText}
         />
       </div>
 
@@ -138,6 +143,17 @@ const TherapistSession: React.FC = () => {
                         <span className="font-bold uppercase tracking-wider text-lg">{t('controls.frozen')}</span>
                         <span className="text-sm text-red-300">Motion below threshold. Check client grounding.</span>
                     </div>
+                 </div>
+             )}
+             
+             {/* 4. Teleprompter Overlay */}
+             {teleprompterText && (
+                 <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-2/3 max-w-3xl pointer-events-none z-[60] animate-in fade-in zoom-in duration-300">
+                     <div className="bg-black/60 backdrop-blur-sm border border-white/10 rounded-2xl p-8 shadow-2xl text-center">
+                         <p className="text-white/90 text-2xl md:text-3xl font-semibold leading-relaxed tracking-wide drop-shadow-lg whitespace-pre-wrap font-sans">
+                             {teleprompterText}
+                         </p>
+                     </div>
                  </div>
              )}
         </div>

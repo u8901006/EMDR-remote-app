@@ -63,6 +63,13 @@ export const translations: Record<Language, any> = {
     "controls.depth": "3D Depth",
     "controls.depthDesc": "Simulate distance change",
     
+    // Emotions
+    "emotion.calm": "Calm",
+    "emotion.fear": "Fear/Anxiety",
+    "emotion.sadness": "Sadness",
+    "emotion.joy": "Joy/Relief",
+    "emotion.detecting": "Detecting...",
+
     // Metrics
     "metrics.title": "Clinical Assessments",
     "metrics.suds": "SUDs",
@@ -95,6 +102,15 @@ export const translations: Record<Language, any> = {
     "presets.empty": "No saved presets",
     "presets.delete": "Delete",
     "presets.create": "Create New",
+
+    // Scripts
+    "scripts.title": "Script Teleprompter",
+    "scripts.select": "Select Protocol Script...",
+    "scripts.project": "Show on Screen",
+    "scripts.hide": "Hide Teleprompter",
+    "scripts.aiPrompt": "Generate Script with AI",
+    "scripts.placeholder": "Select a script or type here to project onto the teleprompter...",
+    "scripts.contextPrompt": "Write a short EMDR script for: ",
 
     // Transcription & Report
     "transcription.title": "Transcription & Notes",
@@ -206,6 +222,13 @@ export const translations: Record<Language, any> = {
     "controls.depth": "3D 深度模擬",
     "controls.depthDesc": "模擬遠近距離變化",
 
+    // Emotions
+    "emotion.calm": "平靜 (Calm)",
+    "emotion.fear": "恐懼/焦慮 (Fear)",
+    "emotion.sadness": "悲傷 (Sadness)",
+    "emotion.joy": "喜悅/放鬆 (Joy)",
+    "emotion.detecting": "偵測中...",
+
     // Metrics
     "metrics.title": "臨床評估",
     "metrics.suds": "SUDs (困擾指數)",
@@ -238,6 +261,15 @@ export const translations: Record<Language, any> = {
     "presets.empty": "無儲存的設定檔",
     "presets.delete": "刪除",
     "presets.create": "建立新設定",
+
+    // Scripts
+    "scripts.title": "腳本提詞機",
+    "scripts.select": "選擇協議腳本...",
+    "scripts.project": "投影至螢幕",
+    "scripts.hide": "隱藏提詞機",
+    "scripts.aiPrompt": "AI 生成腳本",
+    "scripts.placeholder": "請選擇腳本或在此輸入文字，將投影至提詞機...",
+    "scripts.contextPrompt": "請撰寫一段 EMDR 腳本，關於：",
 
     // Transcription & Report
     "transcription.title": "語音轉錄與筆記",

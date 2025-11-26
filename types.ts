@@ -26,6 +26,13 @@ export enum VisualTheme {
 
 export type Language = 'en' | 'zh-TW';
 
+export type EmotionType = 'JOY' | 'SADNESS' | 'FEAR' | 'CALM';
+
+export interface EmotionData {
+  primary: EmotionType;
+  confidence: number;
+}
+
 export interface EMDRSettings {
   isPlaying: boolean;
   speed: number; // 1-100
@@ -62,6 +69,7 @@ export interface ClientStatus {
   isCameraActive: boolean;
   isFrozen: boolean;
   motionScore: number; // 0-100
+  emotion?: EmotionData;
   lastUpdate: number;
 }
 

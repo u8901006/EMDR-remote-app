@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { EMDRSettings, MovementPattern, VisualTheme, MetricType, SessionMetric } from '../types';
-import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp } from 'lucide-react';
-import { PRESET_COLORS, PRESET_BG_COLORS } from '../constants';
+import { EMDRSettings, MovementPattern, VisualTheme, MetricType, SessionMetric, EmotionType } from '../types';
+import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp, Smile, Frown, Meh, AlertOctagon, BookOpen, MonitorUp, MonitorOff } from 'lucide-react';
+import { PRESET_COLORS, PRESET_BG_COLORS, EMDR_SCRIPTS } from '../constants';
 import { useBroadcastSession } from '../hooks/useBroadcastSession';
 import { SessionRole } from '../types';
 import { useLiveKitContext } from '../contexts/LiveKitContext';
@@ -14,6 +14,7 @@ interface TherapistControlsProps {
   updateSettings: (settings: Partial<EMDRSettings>) => void;
   onRequestSummary: (text: string) => void;
   latestSummary?: string; // Generated AI summary passed down from parent
+  onUpdateTeleprompter: (text: string | null) => void;
 }
 
 interface SavedPreset {
@@ -68,7 +69,18 @@ const Sparkline: React.FC<{ data: SessionMetric[], type: MetricType, color: stri
     );
 };
 
-const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateSettings, onRequestSummary, latestSummary }) => {
+// Emotion Icon Helper
+const EmotionIcon: React.FC<{ type: EmotionType }> = ({ type }) => {
+    switch (type) {
+        case 'JOY': return <Smile size={18} className="text-yellow-400" />;
+        case 'SADNESS': return <Frown size={18} className="text-blue-400" />;
+        case 'FEAR': return <AlertOctagon size={18} className="text-red-400" />;
+        case 'CALM': 
+        default: return <Meh size={18} className="text-green-400" />;
+    }
+};
+
+const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateSettings, onRequestSummary, latestSummary, onUpdateTeleprompter }) => {
   const { t, language, setLanguage } = useLanguage();
   const { clientStatus, requestMetric, metrics } = useBroadcastSession(SessionRole.THERAPIST);
   const { connect, disconnect, isConnecting, room } = useLiveKitContext();
@@ -78,6 +90,7 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   const [showPresets, setShowPresets] = useState(false);
   const [showTranscription, setShowTranscription] = useState(false);
   const [showAssessment, setShowAssessment] = useState(true);
+  const [showScripts, setShowScripts] = useState(false);
   const [localGamepadConnected, setLocalGamepadConnected] = useState(false);
   
   const [localLiveKitUrl, setLocalLiveKitUrl] = useState(settings.liveKitUrl);
@@ -88,6 +101,10 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   // Preset State
   const [presets, setPresets] = useState<SavedPreset[]>([]);
   const [newPresetName, setNewPresetName] = useState('');
+
+  // Script State
+  const [scriptContent, setScriptContent] = useState('');
+  const [isTeleprompterActive, setIsTeleprompterActive] = useState(false);
 
   // Stats for Report
   const sessionStartTime = useRef<number>(Date.now());
@@ -215,6 +232,32 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
       localStorage.setItem('emdr-presets', JSON.stringify(updated));
   };
 
+  // Script Logic
+  const handleLoadScript = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const scriptId = e.target.value;
+      const script = EMDR_SCRIPTS.find(s => s.id === scriptId);
+      if (script) {
+          setScriptContent(script.content);
+      }
+  };
+
+  const toggleTeleprompter = () => {
+      if (isTeleprompterActive) {
+          setIsTeleprompterActive(false);
+          onUpdateTeleprompter(null);
+      } else {
+          setIsTeleprompterActive(true);
+          onUpdateTeleprompter(scriptContent || "Please enter script text...");
+      }
+  };
+
+  // Update teleprompter live if active
+  useEffect(() => {
+      if (isTeleprompterActive) {
+          onUpdateTeleprompter(scriptContent);
+      }
+  }, [scriptContent, isTeleprompterActive, onUpdateTeleprompter]);
+
   useEffect(() => {
     const intervalId = setInterval(() => {
         const gps = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -339,14 +382,37 @@ ${t('report.generated')}
                 <Eye size={14} /> {t('controls.clientMonitor')}
             </div>
             {clientStatus ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
                     <div className="flex justify-between items-center text-sm">
                         <span className="text-slate-400">{t('controls.sensor')}</span>
                         <span className={clientStatus.isCameraActive ? "text-green-400" : "text-red-400"}>
                             {clientStatus.isCameraActive ? "Active" : "Inactive"}
                         </span>
                     </div>
-                    <div className="flex justify-between items-center text-sm">
+                    
+                    {/* Emotion Detection Display */}
+                    <div className="bg-slate-900/50 p-2 rounded border border-slate-800 flex items-center gap-3">
+                         <div className="bg-slate-800 p-1.5 rounded-full">
+                            {clientStatus.emotion ? (
+                                <EmotionIcon type={clientStatus.emotion.primary} />
+                            ) : (
+                                <Loader2 size={18} className="text-slate-500 animate-spin" />
+                            )}
+                         </div>
+                         <div className="flex flex-col flex-1">
+                             <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Est. Emotion</span>
+                             <span className="text-sm text-white font-medium">
+                                 {clientStatus.emotion ? t(`emotion.${clientStatus.emotion.primary.toLowerCase()}`) : t('emotion.detecting')}
+                             </span>
+                             {clientStatus.emotion && (
+                                 <div className="w-full h-1 bg-slate-800 rounded-full mt-1">
+                                     <div className="h-full bg-blue-500 rounded-full" style={{ width: `${clientStatus.emotion.confidence}%` }}></div>
+                                 </div>
+                             )}
+                         </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-sm pt-1">
                         <span className="text-slate-400">{t('controls.status')}</span>
                         {clientStatus.isFrozen ? (
                             <span className="text-red-400 font-bold animate-pulse bg-red-900/20 px-2 py-0.5 rounded">{t('controls.frozen')}</span>
@@ -408,6 +474,58 @@ ${t('report.generated')}
                             </button>
                         </div>
                         <Sparkline data={metrics} type="VOC" color="#22c55e" max={7} />
+                    </div>
+                </div>
+            )}
+        </section>
+
+        {/* Script Teleprompter */}
+        <section className="bg-slate-800/30 p-3 rounded-lg border border-slate-700/30">
+            <button 
+                onClick={() => setShowScripts(!showScripts)}
+                className="w-full flex items-center justify-between text-blue-400 font-medium text-sm uppercase tracking-wider"
+            >
+                <div className="flex items-center gap-2"><BookOpen size={14} /> {t('scripts.title')}</div>
+                {showScripts ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+
+            {showScripts && (
+                <div className="space-y-3 mt-3 animate-in fade-in slide-in-from-top-2">
+                    <select 
+                        onChange={handleLoadScript}
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white outline-none"
+                    >
+                        <option value="">{t('scripts.select')}</option>
+                        {EMDR_SCRIPTS.map(s => (
+                            <option key={s.id} value={s.id}>{s.title}</option>
+                        ))}
+                    </select>
+
+                    <textarea
+                        value={scriptContent}
+                        onChange={(e) => setScriptContent(e.target.value)}
+                        placeholder={t('scripts.placeholder')}
+                        className="w-full h-32 bg-slate-950 border border-slate-700 rounded p-2 text-xs text-slate-300 resize-none outline-none focus:border-blue-500/50 leading-relaxed"
+                    />
+
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => onRequestSummary(`${t('scripts.contextPrompt')} ${scriptContent || 'Trauma Processing'}`)}
+                            className="flex-1 py-1.5 bg-purple-900/30 hover:bg-purple-900/50 text-purple-200 border border-purple-500/30 text-xs font-bold rounded flex items-center justify-center gap-2 transition-colors"
+                        >
+                            <Sparkles size={12} /> {t('scripts.aiPrompt')}
+                        </button>
+                        <button 
+                            onClick={toggleTeleprompter}
+                            className={`flex-1 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-2 transition-colors border ${
+                                isTeleprompterActive 
+                                ? 'bg-blue-600 text-white border-blue-500' 
+                                : 'bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600'
+                            }`}
+                        >
+                            {isTeleprompterActive ? <MonitorOff size={12} /> : <MonitorUp size={12} />}
+                            {isTeleprompterActive ? t('scripts.hide') : t('scripts.project')}
+                        </button>
                     </div>
                 </div>
             )}
