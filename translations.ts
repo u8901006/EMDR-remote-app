@@ -1,3 +1,4 @@
+
 import { Language } from "./types";
 
 export const translations: Record<Language, any> = {
@@ -22,6 +23,8 @@ export const translations: Record<Language, any> = {
     "common.back": "Exit",
     "common.end": "End",
     "common.language": "Language",
+    "common.submit": "Submit Score",
+    "common.cancel": "Cancel",
     
     // Therapist Controls
     "controls.clientMonitor": "Client Monitor",
@@ -59,6 +62,30 @@ export const translations: Record<Language, any> = {
     "controls.bg": "Background",
     "controls.depth": "3D Depth",
     "controls.depthDesc": "Simulate distance change",
+    
+    // Metrics
+    "metrics.title": "Clinical Assessments",
+    "metrics.suds": "SUDs",
+    "metrics.voc": "VOC",
+    "metrics.assessSuds": "Assess SUDs",
+    "metrics.assessVoc": "Assess VOC",
+    "metrics.history": "Session History",
+    "metrics.requesting": "Requesting...",
+    "metrics.clientInput": "Client Inputting...",
+    
+    // Themes
+    "theme.title": "Visual Theme",
+    "theme.standard": "Standard (Solid)",
+    "theme.starfield": "Deep Space (Starfield)",
+    "theme.forest": "Breathing Forest",
+    "theme.ocean": "Breathing Ocean",
+    "theme.golden": "Golden Hour",
+    "theme.aurora": "Aurora Borealis",
+    "theme.custom": "Custom Image (Safe Place)",
+    "theme.upload": "Upload Image",
+    "theme.url": "Image URL",
+    "theme.overlay": "Image Dimming",
+    "theme.localNotice": "Note: Large uploaded images may not sync. Use URL for best results.",
 
     // Presets
     "presets.title": "Session Presets",
@@ -82,6 +109,7 @@ export const translations: Record<Language, any> = {
     "report.date": "Date",
     "report.duration": "Session Duration",
     "report.freezeCount": "Dissociation/Freeze Events",
+    "report.metrics": "Assessment Metrics",
     "report.transcript": "Transcript",
     "report.soap": "Clinical Summary (SOAP)",
     "report.generated": "Report generated via MindSync EMDR",
@@ -102,6 +130,10 @@ export const translations: Record<Language, any> = {
     "client.autoConnecting": "Auto-connecting via invite link...",
     "client.preferences": "Preferences",
     "client.localAdjust": "Local adjustments (volume, colors) can be made here. Therapist controls motion.",
+    "client.metric.sudsTitle": "Subjective Units of Disturbance",
+    "client.metric.sudsDesc": "0 is neutral/no disturbance, 10 is the worst disturbance imaginable.",
+    "client.metric.vocTitle": "Validity of Cognition",
+    "client.metric.vocDesc": "1 is completely false, 7 is completely true.",
     
     // AI
     "ai.title": "AI Clinical Assistant",
@@ -134,6 +166,8 @@ export const translations: Record<Language, any> = {
     "common.back": "退出",
     "common.end": "結束",
     "common.language": "語言",
+    "common.submit": "送出評分",
+    "common.cancel": "取消",
 
     // Therapist Controls
     "controls.clientMonitor": "個案監控",
@@ -172,6 +206,30 @@ export const translations: Record<Language, any> = {
     "controls.depth": "3D 深度模擬",
     "controls.depthDesc": "模擬遠近距離變化",
 
+    // Metrics
+    "metrics.title": "臨床評估",
+    "metrics.suds": "SUDs (困擾指數)",
+    "metrics.voc": "VOC (認知真實度)",
+    "metrics.assessSuds": "評估 SUDs",
+    "metrics.assessVoc": "評估 VOC",
+    "metrics.history": "評估紀錄",
+    "metrics.requesting": "請求中...",
+    "metrics.clientInput": "個案輸入中...",
+
+    // Themes
+    "theme.title": "背景情境主題",
+    "theme.standard": "標準 (純色)",
+    "theme.starfield": "深空星際 (Starfield)",
+    "theme.forest": "森林呼吸 (Breathing)",
+    "theme.ocean": "海洋律動 (Ocean)",
+    "theme.golden": "黃昏時刻 (Golden Hour)",
+    "theme.aurora": "極光流動 (Aurora)",
+    "theme.custom": "自訂圖片 (安全地)",
+    "theme.upload": "上傳圖片",
+    "theme.url": "圖片網址",
+    "theme.overlay": "圖片暗度",
+    "theme.localNotice": "注意：大型圖片可能無法同步。建議使用 URL。",
+
     // Presets
     "presets.title": "設定檔預設",
     "presets.save": "儲存設定",
@@ -194,6 +252,7 @@ export const translations: Record<Language, any> = {
     "report.date": "日期",
     "report.duration": "療程總時長",
     "report.freezeCount": "解離/凍結反應次數",
+    "report.metrics": "臨床評估數據",
     "report.transcript": "療程逐字稿",
     "report.soap": "臨床摘要 (SOAP)",
     "report.generated": "本報告由 MindSync EMDR 生成",
@@ -214,6 +273,10 @@ export const translations: Record<Language, any> = {
     "client.autoConnecting": "偵測到邀請連結，正在自動連線...",
     "client.preferences": "偏好設定",
     "client.localAdjust": "您可以在此調整本地設定 (音量、顏色)。動態速度由治療師控制。",
+    "client.metric.sudsTitle": "SUDs 主觀困擾指數",
+    "client.metric.sudsDesc": "0 為平靜無困擾，10 為所能想像最嚴重的困擾。",
+    "client.metric.vocTitle": "VOC 認知真實度",
+    "client.metric.vocDesc": "1 為完全感覺不到真實，7 為感覺完全真實。",
 
     // AI
     "ai.title": "AI 臨床助理",

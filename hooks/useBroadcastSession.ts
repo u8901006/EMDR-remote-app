@@ -1,5 +1,6 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { EMDRSettings, SessionMessage, ClientStatus } from '../types';
+import { EMDRSettings, SessionMessage, ClientStatus, SessionMetric, MetricType } from '../types';
 import { DEFAULT_SETTINGS } from '../constants';
 import { useLiveKitContext } from '../contexts/LiveKitContext';
 import { RoomEvent, DataPacket_Kind, Participant } from 'livekit-client';
@@ -9,6 +10,10 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
   const [settings, setSettings] = useState<EMDRSettings>(DEFAULT_SETTINGS);
   const [clientStatus, setClientStatus] = useState<ClientStatus | null>(null);
   
+  // Clinical Metrics State
+  const [metrics, setMetrics] = useState<SessionMetric[]>([]);
+  const [pendingMetricRequest, setPendingMetricRequest] = useState<MetricType | null>(null);
+
   // Refs to handle stale closures in event listeners
   const settingsRef = useRef<EMDRSettings>(settings);
 
@@ -27,7 +32,6 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
 
         if (message.type === 'SYNC_SETTINGS' && message.payload) {
           if (role === 'CLIENT') {
-             // console.log("Received Settings Sync:", message.payload);
              setSettings(prev => ({ ...prev, ...message.payload }));
           }
         } else if (message.type === 'REQUEST_SYNC' && role === 'THERAPIST') {
@@ -39,6 +43,12 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
           });
         } else if (message.type === 'CLIENT_STATUS' && role === 'THERAPIST' && message.clientStatus) {
           setClientStatus(message.clientStatus);
+        } else if (message.type === 'REQUEST_METRIC' && role === 'CLIENT' && message.metricType) {
+            // Client receives request to open modal
+            setPendingMetricRequest(message.metricType);
+        } else if (message.type === 'SUBMIT_METRIC' && role === 'THERAPIST' && message.metric) {
+            // Therapist receives the score
+            setMetrics(prev => [...prev, message.metric!]);
         }
       } catch (e) {
         console.error("Failed to parse data packet:", e);
@@ -62,8 +72,6 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
   }, [room, role]);
 
   // Helper to send data via LiveKit
-  // reliable: true (TCP-like) for critical settings
-  // reliable: false (UDP-like) for high-frequency sensor data
   const sendData = (message: SessionMessage, reliable: boolean = true) => {
     if (!room) return;
     const str = JSON.stringify(message);
@@ -77,8 +85,6 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
     setSettings(prev => {
       const updated = { ...prev, ...newSettings };
       
-      // Update local state immediately. 
-      // If connected, broadcast to others using RELIABLE transmission (Settings are critical).
       if (role === 'THERAPIST' && room) {
         sendData({
           type: 'SYNC_SETTINGS',
@@ -106,8 +112,6 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
   // Function for Client to broadcast status
   const sendClientStatus = useCallback((status: ClientStatus) => {
     if (role === 'CLIENT' && room) {
-        // Use UNRELIABLE transmission for sensor data to prevent head-of-line blocking
-        // and reduce latency for real-time monitoring.
         sendData({
             type: 'CLIENT_STATUS',
             clientStatus: status,
@@ -116,5 +120,43 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
     }
   }, [role, room]);
 
-  return { settings, updateSettings, clientStatus, sendClientStatus };
+  // --- Metric Logic ---
+  const requestMetric = useCallback((type: MetricType) => {
+      if (role === 'THERAPIST' && room) {
+          sendData({
+              type: 'REQUEST_METRIC',
+              metricType: type,
+              timestamp: Date.now()
+          }, true);
+      }
+  }, [role, room]);
+
+  const submitMetric = useCallback((value: number) => {
+      if (role === 'CLIENT' && room && pendingMetricRequest) {
+          const metric: SessionMetric = {
+              id: Date.now().toString(),
+              type: pendingMetricRequest,
+              value,
+              timestamp: Date.now()
+          };
+          sendData({
+              type: 'SUBMIT_METRIC',
+              metric,
+              timestamp: Date.now()
+          }, true);
+          setPendingMetricRequest(null);
+      }
+  }, [role, room, pendingMetricRequest]);
+
+  return { 
+      settings, 
+      updateSettings, 
+      clientStatus, 
+      sendClientStatus,
+      metrics,
+      pendingMetricRequest,
+      setPendingMetricRequest,
+      requestMetric,
+      submitMetric
+  };
 };

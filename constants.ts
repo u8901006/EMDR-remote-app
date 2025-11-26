@@ -1,4 +1,4 @@
-import { EMDRSettings, MovementPattern } from './types';
+import { EMDRSettings, MovementPattern, VisualTheme } from './types';
 
 export const DEFAULT_SETTINGS: EMDRSettings = {
   isPlaying: false,
@@ -9,6 +9,10 @@ export const DEFAULT_SETTINGS: EMDRSettings = {
   pattern: MovementPattern.LINEAR,
   depthEnabled: false,
   
+  theme: VisualTheme.STANDARD,
+  customImageUrl: '',
+  themeOpacity: 0.3, // Default dimming for images
+
   soundEnabled: false,
   soundVolume: 0.5,
   

@@ -1,10 +1,17 @@
-import React, { useRef, useEffect } from 'react';
-import { EMDRSettings, MovementPattern, SessionRole } from '../types';
+import React, { useRef, useEffect, useState } from 'react';
+import { EMDRSettings, MovementPattern, SessionRole, VisualTheme } from '../types';
 
 interface EMDRCanvasProps {
   settings: EMDRSettings;
   role: SessionRole;
   onSessionComplete?: () => void;
+}
+
+interface Star {
+  x: number;
+  y: number;
+  z: number;
+  size: number;
 }
 
 const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComplete }) => {
@@ -18,6 +25,42 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
   // Audio Context Refs
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevCosRef = useRef<number>(0); // Tracks the derivative to detect peaks
+
+  // Visual Theme Refs
+  const starsRef = useRef<Star[]>([]);
+  const customImageRef = useRef<HTMLImageElement | null>(null);
+  const loadedImageUrlRef = useRef<string>('');
+
+  // Init Stars for Starfield
+  useEffect(() => {
+      const stars: Star[] = [];
+      for (let i = 0; i < 200; i++) {
+          stars.push({
+              x: Math.random() * window.innerWidth,
+              y: Math.random() * window.innerHeight,
+              z: Math.random() * 2 + 0.5, // Parallax factor
+              size: Math.random() * 2
+          });
+      }
+      starsRef.current = stars;
+  }, []);
+
+  // Load Custom Image
+  useEffect(() => {
+      if (settings.theme === VisualTheme.CUSTOM_IMAGE && settings.customImageUrl) {
+          if (loadedImageUrlRef.current !== settings.customImageUrl) {
+              const img = new Image();
+              img.src = settings.customImageUrl;
+              img.onload = () => {
+                  customImageRef.current = img;
+                  loadedImageUrlRef.current = settings.customImageUrl;
+              };
+          }
+      } else {
+          customImageRef.current = null;
+          loadedImageUrlRef.current = '';
+      }
+  }, [settings.theme, settings.customImageUrl]);
 
   // Reset pass counter when playback starts
   useEffect(() => {
@@ -103,6 +146,111 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
     osc.stop(ctx.currentTime + 0.2);
   };
 
+  const drawBackground = (ctx: CanvasRenderingContext2D, width: number, height: number, t: number) => {
+      let grad;
+      let breathe;
+      
+      switch (settings.theme) {
+          case VisualTheme.STANDARD:
+              ctx.fillStyle = settings.backgroundColor;
+              ctx.fillRect(0, 0, width, height);
+              break;
+
+          case VisualTheme.STARFIELD:
+              // Dark Void
+              ctx.fillStyle = '#020617'; // Slate 950
+              ctx.fillRect(0, 0, width, height);
+              
+              ctx.fillStyle = '#ffffff';
+              starsRef.current.forEach(star => {
+                  ctx.globalAlpha = 0.6 + Math.sin(t * star.z) * 0.4; // Twinkle
+                  // Simple drift
+                  const x = (star.x + (t * 20 * star.z)) % width;
+                  ctx.beginPath();
+                  ctx.arc(x, star.y, star.size, 0, 2 * Math.PI);
+                  ctx.fill();
+              });
+              ctx.globalAlpha = 1.0;
+              break;
+
+          case VisualTheme.BREATHING_FOREST:
+              breathe = Math.sin(t * 0.5); // Slow breath
+              // Gradient center moves slightly
+              grad = ctx.createRadialGradient(
+                  width / 2, height / 2 + (breathe * 20), 0, 
+                  width / 2, height / 2, Math.max(width, height)
+              );
+              // Deep Green to Dark Slate
+              grad.addColorStop(0, '#0f2f21'); // Deep Forest
+              grad.addColorStop(0.6 + (breathe * 0.1), '#051f15'); 
+              grad.addColorStop(1, '#020617');
+              
+              ctx.fillStyle = grad;
+              ctx.fillRect(0, 0, width, height);
+              break;
+
+          case VisualTheme.BREATHING_OCEAN:
+              const oceanFlow = Math.sin(t * 0.3);
+              grad = ctx.createLinearGradient(0, 0, 0, height);
+              grad.addColorStop(0, '#0f172a'); // Deep slate/blue
+              grad.addColorStop(0.5 + (oceanFlow * 0.1), '#1e3a8a'); // Blue 900
+              grad.addColorStop(1, '#0d9488'); // Teal 600
+              
+              ctx.fillStyle = grad;
+              ctx.fillRect(0, 0, width, height);
+              break;
+
+          case VisualTheme.GOLDEN_HOUR:
+              // Warm gradient breathing
+              const sunPulse = Math.sin(t * 0.2);
+              grad = ctx.createLinearGradient(0, 0, 0, height); 
+              grad.addColorStop(0, '#4c1d95'); // Violet 900 (Top)
+              grad.addColorStop(0.6 + (sunPulse * 0.05), '#be185d'); // Pink 700
+              grad.addColorStop(1, '#d97706'); // Amber 600 (Bottom)
+              
+              ctx.fillStyle = grad;
+              ctx.fillRect(0, 0, width, height);
+              break;
+
+          case VisualTheme.AURORA:
+              // Shifting diagonal gradient
+              const auroraShift = Math.sin(t * 0.4);
+              grad = ctx.createLinearGradient(0, 0, width, height);
+              grad.addColorStop(0, '#312e81'); // Indigo 900
+              grad.addColorStop(0.3 + (auroraShift * 0.15), '#10b981'); // Emerald 500
+              grad.addColorStop(0.7 - (auroraShift * 0.15), '#8b5cf6'); // Violet 500
+              grad.addColorStop(1, '#020617'); // Dark
+              
+              ctx.fillStyle = grad;
+              ctx.fillRect(0, 0, width, height);
+              break;
+
+          case VisualTheme.CUSTOM_IMAGE:
+              if (customImageRef.current) {
+                  // Draw image cover
+                  const img = customImageRef.current;
+                  const ratio = Math.max(width / img.width, height / img.height);
+                  const centerShift_x = (width - img.width * ratio) / 2;
+                  const centerShift_y = (height - img.height * ratio) / 2;
+                  
+                  ctx.drawImage(img, 0, 0, img.width, img.height, centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
+                  
+                  // Dark overlay for contrast
+                  ctx.fillStyle = `rgba(0,0,0,${settings.themeOpacity})`;
+                  ctx.fillRect(0, 0, width, height);
+              } else {
+                  // Fallback
+                  ctx.fillStyle = '#1e293b';
+                  ctx.fillRect(0, 0, width, height);
+                  ctx.fillStyle = '#64748b';
+                  ctx.textAlign = 'center';
+                  ctx.font = '14px sans-serif';
+                  ctx.fillText('Loading Custom Image...', width / 2, height / 2);
+              }
+              break;
+      }
+  };
+
   const animate = (time: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -114,48 +262,58 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
     if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      // Re-init stars if resized drastically
+      if (Math.abs(canvas.width - window.innerWidth) > 100) {
+           // could re-init stars here
+      }
     }
 
-    // Clear canvas
-    ctx.fillStyle = settings.backgroundColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const width = canvas.width;
+    const height = canvas.height;
 
+    // --- TIMING LOGIC ---
+    let t = timeRef.current;
+    
+    // Update time based on speed if playing
+    if (settings.isPlaying) {
+        // Speed 1 = very slow, Speed 100 = very fast
+        // Base frequency approx 0.1 Hz to 3 Hz
+        const frequency = 0.1 + (settings.speed / 100) * 2.0; 
+        const dt = 0.016; // approx 60fps
+        timeRef.current += dt * frequency * (Math.PI * 2);
+        t = timeRef.current;
+    } else {
+        // Even if paused, we advance 't' very slowly for background effects (breathing, stars)
+        // unless it's standard theme which is static.
+        timeRef.current += 0.005; 
+        t = timeRef.current;
+    }
+
+    // --- DRAW BACKGROUND ---
+    drawBackground(ctx, width, height, t);
+
+    // If Paused, just draw center ball and exit (but background animates)
     if (!settings.isPlaying) {
-        // Draw center if paused
-        const cx = canvas.width / 2;
-        const cy = canvas.height / 2;
+        const cx = width / 2;
+        const cy = height / 2;
         drawBall(ctx, cx, cy, 1, 1);
-        // Keep loop running to handle resize, but don't increment time
         requestRef.current = requestAnimationFrame(animate);
         return;
     }
-
-    // Update time based on speed
-    // Speed 1 = very slow, Speed 100 = very fast
-    // Base frequency approx 0.1 Hz to 3 Hz
-    const frequency = 0.1 + (settings.speed / 100) * 2.0; 
-    const dt = 0.016; // approx 60fps
-    timeRef.current += dt * frequency * (Math.PI * 2);
-
-    const t = timeRef.current;
     
-    // Sync Logic: Detect peaks for Sound & Haptics
-    // We check the derivative (Math.cos). Zero crossing of cos means peak of sin.
+    // --- AUDIO & HAPTIC SYNC ---
     const cosT = Math.cos(t);
     const prevCos = prevCosRef.current;
 
-    // If derivative crosses zero downwards (positive to negative), Sin wave is at Peak (1) -> Right Side
+    // Trigger on peak detection
     if (prevCos > 0 && cosT <= 0) {
         playTone(1);
         triggerHaptics('right');
-    }
-    // If derivative crosses zero upwards (negative to positive), Sin wave is at Trough (-1) -> Left Side
-    else if (prevCos < 0 && cosT >= 0) {
+    } else if (prevCos < 0 && cosT >= 0) {
         playTone(-1);
         triggerHaptics('left');
         
         // Pass Counting Logic
-        // We increment the count when completing a cycle (returning to Left)
         if (settings.targetPasses > 0) {
             currentPassesRef.current += 1;
             if (currentPassesRef.current >= settings.targetPasses) {
@@ -165,8 +323,7 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
     }
     prevCosRef.current = cosT;
 
-    const width = canvas.width;
-    const height = canvas.height;
+    // --- BALL POSITION LOGIC ---
     const padding = settings.size + 20;
     const effectiveWidth = width - (padding * 2);
     const effectiveHeight = height - (padding * 2);
@@ -174,14 +331,11 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
     let x = width / 2;
     let y = height / 2;
 
-    // Calculate Position based on Pattern
     switch (settings.pattern) {
       case MovementPattern.LINEAR:
-        // Sine wave for x, constant y
         x = (width / 2) + (Math.sin(t) * (effectiveWidth / 2));
         break;
       case MovementPattern.SINE:
-        // Sine wave for x, small cosine for y (bobbing)
         x = (width / 2) + (Math.sin(t) * (effectiveWidth / 2));
         y = (height / 2) + (Math.cos(t * 2) * (height / 10));
         break;
@@ -190,45 +344,27 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
         y = (height / 2) + (Math.sin(t * 2) * (height / 8));
         break;
       case MovementPattern.VERTICAL:
-        // Constant X, Sine wave for Y
         x = width / 2;
         y = (height / 2) + (Math.sin(t) * (effectiveHeight / 2));
         break;
       case MovementPattern.ALTERNATED:
-        // Discrete Jump Left/Right
-        // Math.sign(Math.sin(t)) gives 1 or -1 (or 0)
-        // We move fully to one side or the other
         const sign = Math.sin(t) >= 0 ? 1 : -1;
         x = (width / 2) + (sign * (effectiveWidth / 2));
         y = height / 2;
         break;
       case MovementPattern.RANDOM:
-        // A bit more complex, using combined sines for pseudo-randomness
         x = (width / 2) + (Math.sin(t) * (effectiveWidth / 2));
         y = (height / 2) + (Math.sin(t * 1.3) * (height / 6));
         break;
     }
 
-    // 3D Depth Logic
+    // --- 3D DEPTH LOGIC ---
     let scale = 1;
     let opacity = 1.0;
     
     if (settings.depthEnabled) {
-        // Use Math.cos(t) to be 90 degrees out of phase with the standard Sin(t) used for X-axis.
-        // This effectively creates a circular/elliptical path in the X-Z plane.
-        // 1 = Near, -1 = Far
         const depthPhase = Math.cos(t); 
-        
-        // Scale Mapping:
-        // Far (-1) -> 0.6
-        // Near (1) -> 1.4
-        // Formula: 1.0 + (depth * 0.4)
         scale = 1.0 + (depthPhase * 0.4);
-        
-        // Opacity Mapping:
-        // Far (-1) -> 0.6
-        // Near (1) -> 1.0
-        // Normalized depth (0 to 1): (depth + 1) / 2
         opacity = 0.6 + (0.4 * ((depthPhase + 1) / 2));
     }
 
@@ -248,7 +384,7 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
     ctx.fillStyle = settings.color;
     ctx.fill();
     
-    // Glow effect - also scaled
+    // Glow effect
     if (opacity > 0.8) {
         ctx.shadowBlur = 20 * scale;
         ctx.shadowColor = settings.color;
@@ -271,7 +407,6 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
     <canvas
       ref={canvasRef}
       className="block absolute top-0 left-0 w-full h-full cursor-none"
-      style={{ backgroundColor: settings.backgroundColor }}
     />
   );
 };

@@ -1,3 +1,4 @@
+
 export enum SessionRole {
   THERAPIST = 'THERAPIST',
   CLIENT = 'CLIENT',
@@ -13,6 +14,16 @@ export enum MovementPattern {
   ALTERNATED = 'ALTERNATED'
 }
 
+export enum VisualTheme {
+  STANDARD = 'STANDARD',
+  STARFIELD = 'STARFIELD',
+  BREATHING_FOREST = 'BREATHING_FOREST',
+  BREATHING_OCEAN = 'BREATHING_OCEAN',
+  GOLDEN_HOUR = 'GOLDEN_HOUR',
+  AURORA = 'AURORA',
+  CUSTOM_IMAGE = 'CUSTOM_IMAGE'
+}
+
 export type Language = 'en' | 'zh-TW';
 
 export interface EMDRSettings {
@@ -24,6 +35,11 @@ export interface EMDRSettings {
   pattern: MovementPattern;
   depthEnabled: boolean; // 3D effect toggle
   
+  // Visual Themes
+  theme: VisualTheme;
+  customImageUrl: string; // URL or Base64
+  themeOpacity: number; // 0-1 (For custom image dimming)
+
   // Audio
   soundEnabled: boolean;
   soundVolume: number; // 0-1
@@ -49,10 +65,21 @@ export interface ClientStatus {
   lastUpdate: number;
 }
 
+export type MetricType = 'SUD' | 'VOC';
+
+export interface SessionMetric {
+  id: string;
+  type: MetricType;
+  value: number;
+  timestamp: number;
+}
+
 export interface SessionMessage {
-  type: 'SYNC_SETTINGS' | 'REQUEST_SYNC' | 'SESSION_END' | 'CLIENT_STATUS';
+  type: 'SYNC_SETTINGS' | 'REQUEST_SYNC' | 'SESSION_END' | 'CLIENT_STATUS' | 'REQUEST_METRIC' | 'SUBMIT_METRIC';
   payload?: Partial<EMDRSettings>;
   clientStatus?: ClientStatus;
+  metricType?: MetricType; // For REQUEST_METRIC
+  metric?: SessionMetric;  // For SUBMIT_METRIC
   timestamp: number;
 }
 

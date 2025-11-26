@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { EMDRSettings, MovementPattern } from '../types';
-import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat } from 'lucide-react';
+import { EMDRSettings, MovementPattern, VisualTheme, MetricType, SessionMetric } from '../types';
+import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp } from 'lucide-react';
 import { PRESET_COLORS, PRESET_BG_COLORS } from '../constants';
 import { useBroadcastSession } from '../hooks/useBroadcastSession';
 import { SessionRole } from '../types';
@@ -25,15 +26,58 @@ const PRESET_DURATIONS = [30, 60, 120, 300, 600];
 
 type TerminationMode = 'MANUAL' | 'TIMER' | 'PASSES';
 
+// Simple SVG Sparkline Component
+const Sparkline: React.FC<{ data: SessionMetric[], type: MetricType, color: string, max: number }> = ({ data, type, color, max }) => {
+    const filtered = data.filter(d => d.type === type).sort((a,b) => a.timestamp - b.timestamp);
+    if (filtered.length === 0) return <div className="h-10 w-full bg-slate-950/50 rounded flex items-center justify-center text-[10px] text-slate-600">No Data</div>;
+
+    const width = 200;
+    const height = 40;
+    const padding = 5;
+    
+    // Normalize logic
+    const getX = (i: number) => {
+        if (filtered.length === 1) return width / 2;
+        return padding + (i / (filtered.length - 1)) * (width - 2 * padding);
+    };
+    
+    const getY = (val: number) => {
+        return height - padding - (val / max) * (height - 2 * padding);
+    };
+
+    const points = filtered.map((d, i) => `${getX(i)},${getY(d.value)}`).join(' ');
+
+    return (
+        <div className="relative h-10 w-full">
+            <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
+                {/* Reference Line (Midpoint) */}
+                <line x1="0" y1={height/2} x2={width} y2={height/2} stroke="#334155" strokeDasharray="2,2" strokeWidth="1" />
+                
+                {/* The Line */}
+                <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                
+                {/* Dots */}
+                {filtered.map((d, i) => (
+                    <circle key={d.id} cx={getX(i)} cy={getY(d.value)} r="3" fill="#0f172a" stroke={color} strokeWidth="1.5" />
+                ))}
+            </svg>
+            <div className="absolute top-0 right-0 text-[10px] font-bold" style={{ color }}>
+                {filtered[filtered.length - 1].value}
+            </div>
+        </div>
+    );
+};
+
 const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateSettings, onRequestSummary, latestSummary }) => {
   const { t, language, setLanguage } = useLanguage();
-  const { clientStatus } = useBroadcastSession(SessionRole.THERAPIST);
+  const { clientStatus, requestMetric, metrics } = useBroadcastSession(SessionRole.THERAPIST);
   const { connect, disconnect, isConnecting, room } = useLiveKitContext();
   const { isListening, transcript, startListening, stopListening, resetTranscript, hasBrowserSupport } = useVoiceRecognition(language);
   
   const [showVideoConfig, setShowVideoConfig] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [showTranscription, setShowTranscription] = useState(false);
+  const [showAssessment, setShowAssessment] = useState(true);
   const [localGamepadConnected, setLocalGamepadConnected] = useState(false);
   
   const [localLiveKitUrl, setLocalLiveKitUrl] = useState(settings.liveKitUrl);
@@ -53,6 +97,12 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   // Termination Mode Logic
   const [terminationMode, setTerminationMode] = useState<TerminationMode>('MANUAL');
   
+  // Image Upload Ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Request State
+  const [requestingMetric, setRequestingMetric] = useState<MetricType | null>(null);
+
   useEffect(() => {
       // Determine mode from initial settings or external updates
       if (settings.targetPasses > 0) {
@@ -83,6 +133,17 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
       prevFrozenState.current = !!clientStatus?.isFrozen;
   }, [clientStatus?.isFrozen]);
 
+  // Reset requesting state when a new metric arrives
+  useEffect(() => {
+      if (requestingMetric) {
+          // Check if we got a new metric of that type that is recent
+          const recent = metrics.filter(m => m.type === requestingMetric && m.timestamp > Date.now() - 2000);
+          if (recent.length > 0) {
+              setRequestingMetric(null);
+          }
+      }
+  }, [metrics, requestingMetric]);
+
   // Load presets on mount
   useEffect(() => {
     const saved = localStorage.getItem('emdr-presets');
@@ -98,8 +159,6 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   useEffect(() => { setLocalLiveKitUrl(settings.liveKitUrl); }, [settings.liveKitUrl]);
   useEffect(() => { setLocalTherapistToken(settings.liveKitTherapistToken); }, [settings.liveKitTherapistToken]);
   useEffect(() => { setLocalClientToken(settings.liveKitClientToken); }, [settings.liveKitClientToken]);
-  
-  const isNonStandardDuration = !PRESET_DURATIONS.includes(settings.durationSeconds) && settings.durationSeconds > 0;
   
   const handleConnect = async () => {
     updateSettings({
@@ -169,6 +228,29 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   const handlePatternChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     updateSettings({ pattern: e.target.value as MovementPattern });
   };
+  
+  const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      updateSettings({ theme: e.target.value as VisualTheme });
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              const base64String = reader.result as string;
+              updateSettings({ customImageUrl: base64String });
+          };
+          reader.readAsDataURL(file);
+      }
+  };
+
+  const handleRequestMetric = (type: MetricType) => {
+      requestMetric(type);
+      setRequestingMetric(type);
+      // Timeout reset in case client doesn't respond
+      setTimeout(() => setRequestingMetric(null), 15000);
+  };
 
   const testHaptics = () => {
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -190,6 +272,10 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
     const durationSec = Math.floor((durationMs % 60000) / 1000);
     const dateStr = new Date().toLocaleString(language === 'zh-TW' ? 'zh-TW' : 'en-US');
 
+    // Format metrics
+    const sudsList = metrics.filter(m => m.type === 'SUD').map(m => `[${new Date(m.timestamp).toLocaleTimeString()}] SUD: ${m.value}/10`).join('\n');
+    const vocList = metrics.filter(m => m.type === 'VOC').map(m => `[${new Date(m.timestamp).toLocaleTimeString()}] VOC: ${m.value}/7`).join('\n');
+
     const reportContent = `
 ==================================================
 ${t('report.title')}
@@ -198,6 +284,13 @@ ${t('report.title')}
 ${t('report.date')}: ${dateStr}
 ${t('report.duration')}: ${durationMin}m ${durationSec}s
 ${t('report.freezeCount')}: ${freezeCount}
+
+--------------------------------------------------
+${t('report.metrics')}
+--------------------------------------------------
+${sudsList || '(No SUDs recorded)'}
+
+${vocList || '(No VOC recorded)'}
 
 --------------------------------------------------
 ${t('report.soap')}
@@ -273,20 +366,51 @@ ${t('report.generated')}
                     {t('common.waiting')}
                 </div>
             )}
-             <div className="mt-2 pt-2 border-t border-slate-700/50">
-                <div className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-400">{t('controls.sensitivity')}</span>
-                    <span className="text-slate-300">{settings.freezeSensitivity}%</span>
+        </section>
+
+        {/* Clinical Assessment */}
+        <section className="bg-slate-800/30 p-3 rounded-lg border border-slate-700/30">
+            <button 
+                onClick={() => setShowAssessment(!showAssessment)}
+                className="w-full flex items-center justify-between text-blue-400 font-medium text-sm uppercase tracking-wider"
+            >
+                <div className="flex items-center gap-2"><ClipboardCheck size={14} /> {t('metrics.title')}</div>
+                {showAssessment ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+            
+            {showAssessment && (
+                <div className="space-y-4 mt-3 animate-in fade-in slide-in-from-top-2">
+                    {/* SUDs */}
+                    <div className="space-y-1">
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-400 font-bold">{t('metrics.suds')}</span>
+                            <button 
+                                onClick={() => handleRequestMetric('SUD')}
+                                disabled={requestingMetric === 'SUD' || !room}
+                                className="text-[10px] bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded hover:bg-blue-800/60 disabled:opacity-50"
+                            >
+                                {requestingMetric === 'SUD' ? t('metrics.requesting') : t('metrics.assessSuds')}
+                            </button>
+                        </div>
+                        <Sparkline data={metrics} type="SUD" color="#ef4444" max={10} />
+                    </div>
+
+                    {/* VOC */}
+                    <div className="space-y-1">
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-400 font-bold">{t('metrics.voc')}</span>
+                            <button 
+                                onClick={() => handleRequestMetric('VOC')}
+                                disabled={requestingMetric === 'VOC' || !room}
+                                className="text-[10px] bg-green-900/40 text-green-300 px-2 py-0.5 rounded hover:bg-green-800/60 disabled:opacity-50"
+                            >
+                                {requestingMetric === 'VOC' ? t('metrics.requesting') : t('metrics.assessVoc')}
+                            </button>
+                        </div>
+                        <Sparkline data={metrics} type="VOC" color="#22c55e" max={7} />
+                    </div>
                 </div>
-                <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={settings.freezeSensitivity}
-                    onChange={(e) => updateSettings({ freezeSensitivity: parseInt(e.target.value) })}
-                    className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                />
-            </div>
+            )}
         </section>
 
         {/* Voice Transcription */}
@@ -632,7 +756,7 @@ ${t('report.generated')}
             </div>
         </section>
 
-        {/* Visuals */}
+        {/* Visuals - THEME & BACKGROUND */}
         <section className="space-y-4">
             <div className="flex items-center gap-2 text-blue-400 font-medium text-sm uppercase tracking-wider">
                 <Palette size={14} /> {t('controls.visuals')}
@@ -651,6 +775,89 @@ ${t('report.generated')}
                 </button>
             </div>
 
+            {/* Theme Selector */}
+            <div className="space-y-2">
+                <label className="text-sm">{t('theme.title')}</label>
+                <select 
+                    value={settings.theme} 
+                    onChange={handleThemeChange} 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-md p-2 text-white outline-none text-xs"
+                >
+                    <option value={VisualTheme.STANDARD}>{t('theme.standard')}</option>
+                    <option value={VisualTheme.STARFIELD}>{t('theme.starfield')}</option>
+                    <option value={VisualTheme.BREATHING_FOREST}>{t('theme.forest')}</option>
+                    <option value={VisualTheme.BREATHING_OCEAN}>{t('theme.ocean')}</option>
+                    <option value={VisualTheme.GOLDEN_HOUR}>{t('theme.golden')}</option>
+                    <option value={VisualTheme.AURORA}>{t('theme.aurora')}</option>
+                    <option value={VisualTheme.CUSTOM_IMAGE}>{t('theme.custom')}</option>
+                </select>
+            </div>
+
+            {/* Custom Image Controls */}
+            {settings.theme === VisualTheme.CUSTOM_IMAGE && (
+                <div className="space-y-3 bg-slate-800/30 p-2 rounded border border-slate-700/30 animate-in fade-in zoom-in duration-200">
+                    <div>
+                        <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleImageUpload}
+                            ref={fileInputRef}
+                            className="hidden"
+                        />
+                        <button 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-full py-1.5 bg-slate-700 hover:bg-slate-600 text-xs text-white rounded flex items-center justify-center gap-2 mb-2"
+                        >
+                            <Upload size={12} /> {t('theme.upload')}
+                        </button>
+                        
+                        <div className="flex gap-2">
+                            <ImageIcon size={14} className="text-slate-500 mt-1" />
+                            <input 
+                                type="text"
+                                placeholder={t('theme.url')}
+                                value={settings.customImageUrl.startsWith('data:') ? '' : settings.customImageUrl}
+                                onChange={(e) => updateSettings({ customImageUrl: e.target.value })}
+                                className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 outline-none"
+                            />
+                        </div>
+                        {settings.customImageUrl.startsWith('data:') && (
+                            <p className="text-[10px] text-yellow-500 mt-1 flex items-center gap-1">
+                                <AlertTriangle size={10} /> {t('theme.localNotice')}
+                            </p>
+                        )}
+                    </div>
+                    
+                    <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-slate-400">
+                             <span>{t('theme.overlay')}</span>
+                             <span>{Math.round(settings.themeOpacity * 100)}%</span>
+                        </div>
+                        <input
+                            type="range"
+                            min="0"
+                            max="0.9"
+                            step="0.1"
+                            value={settings.themeOpacity}
+                            onChange={(e) => updateSettings({ themeOpacity: parseFloat(e.target.value) })}
+                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Background Color (Only for Standard) */}
+            {settings.theme === VisualTheme.STANDARD && (
+                <div className="space-y-2">
+                    <label className="text-sm">{t('controls.bg')}</label>
+                    <div className="flex gap-2 flex-wrap">
+                        {PRESET_BG_COLORS.map(c => (
+                            <button key={c} onClick={() => updateSettings({ backgroundColor: c })} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${settings.backgroundColor === c ? 'border-white scale-110' : 'border-slate-700'}`} style={{ backgroundColor: c }} />
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div className="space-y-2">
                 <label className="text-sm">{t('controls.color')}</label>
                 <div className="flex gap-2 flex-wrap">
@@ -658,15 +865,6 @@ ${t('report.generated')}
                         <button key={c} onClick={() => updateSettings({ color: c })} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${settings.color === c ? 'border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: c }} />
                     ))}
                      <input type="color" value={settings.color} onChange={(e) => updateSettings({ color: e.target.value })} className="w-8 h-8 rounded-full p-0 overflow-hidden border-0 cursor-pointer" />
-                </div>
-            </div>
-
-            <div className="space-y-2">
-                <label className="text-sm">{t('controls.bg')}</label>
-                <div className="flex gap-2 flex-wrap">
-                    {PRESET_BG_COLORS.map(c => (
-                        <button key={c} onClick={() => updateSettings({ backgroundColor: c })} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${settings.backgroundColor === c ? 'border-white scale-110' : 'border-slate-700'}`} style={{ backgroundColor: c }} />
-                    ))}
                 </div>
             </div>
         </section>
