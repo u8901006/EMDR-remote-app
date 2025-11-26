@@ -237,7 +237,8 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
       const scriptId = e.target.value;
       const script = EMDR_SCRIPTS.find(s => s.id === scriptId);
       if (script) {
-          setScriptContent(script.content);
+          const content = language === 'zh-TW' ? script.content['zh-TW'] : script.content.en;
+          setScriptContent(content);
       }
   };
 
@@ -497,7 +498,9 @@ ${t('report.generated')}
                     >
                         <option value="">{t('scripts.select')}</option>
                         {EMDR_SCRIPTS.map(s => (
-                            <option key={s.id} value={s.id}>{s.title}</option>
+                            <option key={s.id} value={s.id}>
+                                {language === 'zh-TW' ? s.title['zh-TW'] : s.title.en}
+                            </option>
                         ))}
                     </select>
 
