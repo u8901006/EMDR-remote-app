@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import { EMDRSettings, MovementPattern, SessionRole, VisualTheme } from '../types';
 
@@ -213,9 +214,15 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
               break;
 
           case VisualTheme.AURORA:
-              // Shifting diagonal gradient
+              // Shifting diagonal gradient with dual modulation for organic feel
               const auroraShift = Math.sin(t * 0.4);
-              grad = ctx.createLinearGradient(0, 0, width, height);
+              const auroraShift2 = Math.cos(t * 0.3);
+              
+              // Move gradient angle slightly
+              grad = ctx.createLinearGradient(
+                  0 + (auroraShift2 * 50), 0, 
+                  width - (auroraShift2 * 50), height
+              );
               grad.addColorStop(0, '#312e81'); // Indigo 900
               grad.addColorStop(0.3 + (auroraShift * 0.15), '#10b981'); // Emerald 500
               grad.addColorStop(0.7 - (auroraShift * 0.15), '#8b5cf6'); // Violet 500
