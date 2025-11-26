@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, AlertTriangle, Maximize2, Minimize2, Video, Activity } from 'lucide-react';
 import TherapistControls from '../components/TherapistControls';
 import EMDRCanvas from '../components/EMDRCanvas';
-import AIAssistant from '../components/AIAssistant';
+import AIAssistant, { AIAssistantHandle } from '../components/AIAssistant';
 import LiveVideo from '../components/LiveVideo';
 import { useBroadcastSession } from '../hooks/useBroadcastSession';
 import { SessionRole } from '../types';
@@ -15,16 +15,29 @@ const TherapistSession: React.FC = () => {
   
   // View Mode: 'canvas' (Default, EMDR Focus) vs 'video' (Client Focus)
   const [viewMode, setViewMode] = useState<'canvas' | 'video'>('canvas');
+  
+  // Ref to control AI Assistant from other components
+  const aiAssistantRef = useRef<AIAssistantHandle>(null);
 
   const toggleViewMode = () => {
     setViewMode(prev => prev === 'canvas' ? 'video' : 'canvas');
+  };
+
+  const handleRequestSummary = (text: string) => {
+    if (aiAssistantRef.current) {
+        aiAssistantRef.current.triggerPrompt(text, 'summary');
+    }
   };
 
   return (
     <div className="flex h-screen w-screen bg-slate-950 overflow-hidden">
       {/* Controls Sidebar */}
       <div className="z-30 shadow-2xl">
-        <TherapistControls settings={settings} updateSettings={updateSettings} />
+        <TherapistControls 
+            settings={settings} 
+            updateSettings={updateSettings} 
+            onRequestSummary={handleRequestSummary}
+        />
       </div>
 
       {/* Main Preview Area */}
@@ -112,7 +125,7 @@ const TherapistSession: React.FC = () => {
       </div>
 
       {/* AI Assistant Overlay */}
-      <AIAssistant />
+      <AIAssistant ref={aiAssistantRef} />
     </div>
   );
 };

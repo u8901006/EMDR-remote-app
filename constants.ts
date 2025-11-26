@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS: EMDRSettings = {
   color: '#3b82f6', // Blue-500
   backgroundColor: '#020617', // Slate-950
   pattern: MovementPattern.LINEAR,
+  depthEnabled: false,
   
   soundEnabled: false,
   soundVolume: 0.5,

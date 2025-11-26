@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { Maximize, Minimize, ArrowLeft, Loader2, Settings2, X, Clock, Sliders, Volume2, VolumeX, Gamepad2, Palette, Link as LinkIcon, AlertCircle, Globe, Video, Activity } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Maximize, Minimize, ArrowLeft, Loader2, Settings2, X, Clock, Sliders, Volume2, VolumeX, Gamepad2, Palette, Link as LinkIcon, AlertCircle, Globe, Video, Activity, ChevronDown, ChevronRight, Box } from 'lucide-react';
 import EMDRCanvas from '../components/EMDRCanvas';
 import EyeTracker from '../components/EyeTracker';
 import LiveVideo from '../components/LiveVideo';
@@ -14,6 +14,7 @@ const ClientSession: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
   const { settings, updateSettings, sendClientStatus } = useBroadcastSession(SessionRole.CLIENT);
   const { room, connect, isConnecting, error } = useLiveKitContext();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -23,12 +24,44 @@ const ClientSession: React.FC = () => {
   
   const [tokenInput, setTokenInput] = useState(settings.liveKitClientToken || '');
   const [urlInput, setUrlInput] = useState(settings.liveKitUrl || '');
+  const [isAutoConnecting, setIsAutoConnecting] = useState(false);
+  const autoConnectAttempted = useRef(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   
   const [viewMode, setViewMode] = useState<'canvas' | 'video'>('canvas');
 
+  // Load URL parameters and auto-connect
   useEffect(() => {
-    if (settings.liveKitUrl) setUrlInput(settings.liveKitUrl);
-    if (settings.liveKitClientToken) setTokenInput(settings.liveKitClientToken);
+    const urlParam = searchParams.get('url');
+    const tokenParam = searchParams.get('token');
+
+    // Strict check to ensure we only try once and only if valid params exist
+    if (urlParam && tokenParam && !room && !isConnecting && !autoConnectAttempted.current) {
+        autoConnectAttempted.current = true;
+        
+        setUrlInput(urlParam);
+        setTokenInput(tokenParam);
+        setIsAutoConnecting(true);
+        
+        // Security: Remove sensitive token from URL immediately so it's not in history/screenshots
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('url');
+        newParams.delete('token');
+        setSearchParams(newParams, { replace: true });
+
+        // Connect immediately
+        connect(urlParam, tokenParam).catch((err) => {
+             console.error("Auto-connect failed:", err);
+             // Note: We don't reset autoConnectAttempted here to prevent loop, user can retry manually
+        }).finally(() => {
+            setIsAutoConnecting(false);
+        });
+    }
+  }, [searchParams, room, isConnecting, connect, setSearchParams]);
+
+  useEffect(() => {
+    if (settings.liveKitUrl && !urlInput) setUrlInput(settings.liveKitUrl);
+    if (settings.liveKitClientToken && !tokenInput) setTokenInput(settings.liveKitClientToken);
   }, [settings.liveKitUrl, settings.liveKitClientToken]);
 
   const resetHideTimer = () => {
@@ -77,9 +110,9 @@ const ClientSession: React.FC = () => {
   if (!room) {
       return (
         <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
-             <div className="max-w-md w-full bg-slate-900 border border-slate-700 rounded-xl p-6 shadow-2xl">
+             <div className="max-w-md w-full bg-slate-900 border border-slate-700 rounded-xl p-6 shadow-2xl transition-all duration-300">
                  <div className="flex flex-col items-center mb-6">
-                    <div className="w-12 h-12 bg-blue-900/50 rounded-full flex items-center justify-center mb-4">
+                    <div className="w-12 h-12 bg-blue-900/50 rounded-full flex items-center justify-center mb-4 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
                         <LinkIcon className="text-blue-400" size={24} />
                     </div>
                     <h2 className="text-xl font-bold text-white">{t('client.join')}</h2>
@@ -87,53 +120,91 @@ const ClientSession: React.FC = () => {
                  </div>
 
                  <div className="space-y-4">
-                    <div>
-                        <label className="text-xs text-slate-500 uppercase font-bold tracking-wider">{t('controls.serverUrl')}</label>
-                        <input 
-                            type="text" 
-                            value={urlInput}
-                            onChange={(e) => setUrlInput(e.target.value)}
-                            placeholder="wss://..."
-                            className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white focus:border-blue-500 outline-none mt-1"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs text-slate-500 uppercase font-bold tracking-wider">{t('controls.clientToken')}</label>
-                        <input 
-                            type="password" 
-                            value={tokenInput}
-                            onChange={(e) => setTokenInput(e.target.value)}
-                            placeholder="Token..."
-                            className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white focus:border-blue-500 outline-none mt-1"
-                        />
-                    </div>
+                    {isAutoConnecting ? (
+                        <div className="flex flex-col items-center justify-center py-8 space-y-4 animate-in fade-in zoom-in duration-300">
+                            <div className="relative">
+                                <div className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <Video size={20} className="text-blue-400 opacity-50" />
+                                </div>
+                            </div>
+                            <div className="text-center space-y-1">
+                                <p className="text-blue-300 font-medium animate-pulse">{t('client.autoConnecting')}</p>
+                                <p className="text-xs text-slate-500">Securing connection...</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            {/* Token Input - Primary */}
+                            <div>
+                                <label className="text-xs text-slate-500 uppercase font-bold tracking-wider">{t('client.tokenLabel')}</label>
+                                <input 
+                                    type="password" 
+                                    value={tokenInput}
+                                    onChange={(e) => setTokenInput(e.target.value)}
+                                    placeholder="Token..."
+                                    className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white focus:border-blue-500 outline-none mt-1 transition-colors"
+                                    autoFocus
+                                />
+                            </div>
 
-                    {error && (
-                        <div className="p-3 bg-red-900/20 border border-red-500/30 rounded text-red-300 text-xs flex items-center gap-2">
-                            <AlertCircle size={14} /> {error}
+                            {/* Advanced Server URL */}
+                            <div className="pt-2">
+                                <button 
+                                    onClick={() => setShowAdvanced(!showAdvanced)}
+                                    className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                                >
+                                    {showAdvanced ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                    {t('client.advanced')}
+                                </button>
+                                
+                                {showAdvanced && (
+                                    <div className="mt-2 pl-3 border-l-2 border-slate-800 animate-in fade-in slide-in-from-top-1">
+                                        <label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">{t('controls.serverUrl')}</label>
+                                        <input 
+                                            type="text" 
+                                            value={urlInput}
+                                            onChange={(e) => setUrlInput(e.target.value)}
+                                            placeholder="wss://..."
+                                            className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-slate-300 focus:border-blue-500 outline-none mt-1 transition-colors"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {error && (
+                                <div className="mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded text-red-300 text-xs flex items-center gap-2 animate-in slide-in-from-top-1">
+                                    <AlertCircle size={14} className="shrink-0" /> {error}
+                                </div>
+                            )}
+
+                            <div className="mt-8 flex flex-col gap-3">
+                                <button 
+                                    onClick={() => connect(urlInput, tokenInput)}
+                                    disabled={isConnecting || !urlInput || !tokenInput}
+                                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg flex items-center justify-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20"
+                                >
+                                    {isConnecting ? <Loader2 size={18} className="animate-spin" /> : t('client.join')}
+                                </button>
+                                
+                                <Link 
+                                    to="/" 
+                                    className="w-full py-3 bg-transparent border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white font-medium rounded-lg flex items-center justify-center transition-colors"
+                                >
+                                    {t('ai.cancel')}
+                                </Link>
+                            </div>
                         </div>
                     )}
-
-                    <button 
-                        onClick={() => connect(urlInput, tokenInput)}
-                        disabled={isConnecting || !urlInput || !tokenInput}
-                        className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-                    >
-                        {isConnecting ? <Loader2 size={18} className="animate-spin" /> : t('client.join')}
-                    </button>
-
-                    <div className="text-center mt-4">
-                        <Link to="/" className="text-slate-500 hover:text-white text-sm">{t('ai.cancel')}</Link>
-                    </div>
                  </div>
                  
                  {/* Language Switcher for Join Screen */}
                  <div className="mt-6 pt-4 border-t border-slate-800">
                     <button 
                         onClick={() => setLanguage(language === 'en' ? 'zh-TW' : 'en')}
-                        className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-white transition-colors text-xs"
+                        className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-white transition-colors text-xs group"
                     >
-                        <Globe size={12} />
+                        <Globe size={12} className="group-hover:rotate-12 transition-transform" />
                         {language === 'en' ? 'Switch to 繁體中文' : 'Switch to English'}
                     </button>
                  </div>
@@ -183,7 +254,7 @@ const ClientSession: React.FC = () => {
         className={`absolute top-0 left-0 w-full p-6 flex justify-between items-start pointer-events-none transition-opacity duration-300 z-50 ${showControls ? 'opacity-100' : 'opacity-0'}`}
       >
         <div className={`pointer-events-auto transition-all duration-300 ${viewMode === 'canvas' ? 'mt-48' : ''}`}>
-            <Link to="/" className="flex items-center gap-2 text-slate-400 hover:text-white bg-black/60 hover:bg-black/80 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 transition-all shadow-lg">
+            <Link to="/" className="flex items-center gap-2 text-slate-400 hover:text-white bg-black/60 hover:bg-black/80 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 transition-all shadow-lg hover:scale-105">
                 <ArrowLeft size={16} /> {t('common.end')}
             </Link>
         </div>
@@ -198,7 +269,7 @@ const ClientSession: React.FC = () => {
             
             <button 
                 onClick={() => setViewMode(prev => prev === 'canvas' ? 'video' : 'canvas')}
-                className="text-slate-300 hover:text-white bg-black/60 hover:bg-black/80 p-2 rounded-full backdrop-blur-md border border-white/10 transition-all shadow-lg"
+                className="text-slate-300 hover:text-white bg-black/60 hover:bg-black/80 p-2 rounded-full backdrop-blur-md border border-white/10 transition-all shadow-lg hover:scale-110"
                 title={viewMode === 'canvas' ? "Maximize Video" : "Show EMDR"}
             >
                 {viewMode === 'canvas' ? <Video size={20} /> : <Activity size={20} />}
@@ -206,7 +277,7 @@ const ClientSession: React.FC = () => {
 
             <button 
                 onClick={() => setShowSettingsMenu(true)}
-                className="text-slate-300 hover:text-white bg-black/60 hover:bg-black/80 p-2 rounded-full backdrop-blur-md border border-white/10 transition-all shadow-lg"
+                className="text-slate-300 hover:text-white bg-black/60 hover:bg-black/80 p-2 rounded-full backdrop-blur-md border border-white/10 transition-all shadow-lg hover:scale-110"
                 title={t('common.settings')}
             >
                 <Settings2 size={20} />
@@ -214,7 +285,7 @@ const ClientSession: React.FC = () => {
 
             <button 
                 onClick={toggleFullscreen}
-                className="text-slate-300 hover:text-white bg-black/60 hover:bg-black/80 p-2 rounded-full backdrop-blur-md border border-white/10 transition-all shadow-lg"
+                className="text-slate-300 hover:text-white bg-black/60 hover:bg-black/80 p-2 rounded-full backdrop-blur-md border border-white/10 transition-all shadow-lg hover:scale-110"
                 title="Toggle Fullscreen"
             >
                 {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
@@ -229,11 +300,11 @@ const ClientSession: React.FC = () => {
                     <h2 className="text-white font-bold text-lg tracking-wide flex items-center gap-2">
                         <Settings2 size={20} className="text-blue-500" /> {t('client.preferences')}
                     </h2>
-                    <button onClick={() => setShowSettingsMenu(false)} className="text-slate-400 hover:text-white"><X size={24} /></button>
+                    <button onClick={() => setShowSettingsMenu(false)} className="text-slate-400 hover:text-white transition-colors"><X size={24} /></button>
                 </div>
 
                 <div className="space-y-8">
-                     <div className="p-4 bg-slate-800 rounded text-sm text-slate-300">
+                     <div className="p-4 bg-slate-800/50 border border-slate-700 rounded text-sm text-slate-300 leading-relaxed">
                         {t('client.localAdjust')}
                      </div>
 
@@ -244,7 +315,7 @@ const ClientSession: React.FC = () => {
                         <select
                             value={settings.durationSeconds}
                             onChange={(e) => updateSettings({ durationSeconds: Number(e.target.value) })}
-                            className="w-full bg-slate-800 border border-slate-700 rounded-md p-2 text-white text-sm outline-none focus:border-blue-500"
+                            className="w-full bg-slate-800 border border-slate-700 rounded-md p-2 text-white text-sm outline-none focus:border-blue-500 transition-colors"
                         >
                             <option value={0}>Infinite</option>
                             <option value={30}>30s</option>
@@ -270,7 +341,7 @@ const ClientSession: React.FC = () => {
                                 max="100"
                                 value={settings.speed}
                                 onChange={(e) => updateSettings({ speed: parseInt(e.target.value) })}
-                                className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400"
                             />
                         </div>
 
@@ -285,7 +356,7 @@ const ClientSession: React.FC = () => {
                                 max="150"
                                 value={settings.size}
                                 onChange={(e) => updateSettings({ size: parseInt(e.target.value) })}
-                                className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400"
                             />
                         </div>
 
@@ -294,7 +365,7 @@ const ClientSession: React.FC = () => {
                             <select 
                                 value={settings.pattern}
                                 onChange={handlePatternChange}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-md p-2 text-white text-sm outline-none focus:border-blue-500"
+                                className="w-full bg-slate-800 border border-slate-700 rounded-md p-2 text-white text-sm outline-none focus:border-blue-500 transition-colors"
                             >
                                 <option value={MovementPattern.LINEAR}>{t('pattern.linear')}</option>
                                 <option value={MovementPattern.SINE}>{t('pattern.sine')}</option>
@@ -303,6 +374,26 @@ const ClientSession: React.FC = () => {
                                 <option value={MovementPattern.ALTERNATED}>{t('pattern.alternated')}</option>
                                 <option value={MovementPattern.RANDOM}>{t('pattern.random')}</option>
                             </select>
+                        </div>
+                    </section>
+                    
+                    {/* Visuals - Added Depth Toggle here too */}
+                    <section className="space-y-4">
+                        <div className="flex items-center gap-2 text-blue-400 font-medium text-sm uppercase tracking-wider">
+                            <Palette size={14} /> {t('controls.visuals')}
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <div className="flex flex-col">
+                                <span className="text-sm text-slate-300">{t('controls.depth')}</span>
+                                <span className="text-[10px] text-slate-500">{t('controls.depthDesc')}</span>
+                            </div>
+                            <button
+                                onClick={() => updateSettings({ depthEnabled: !settings.depthEnabled })}
+                                className={`w-12 h-6 rounded-full transition-colors relative ${settings.depthEnabled ? 'bg-blue-600' : 'bg-slate-700'}`}
+                            >
+                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.depthEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                            </button>
                         </div>
                     </section>
 
@@ -320,7 +411,7 @@ const ClientSession: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className={`space-y-2 transition-opacity ${settings.soundEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                        <div className={`space-y-2 transition-all duration-300 ${settings.soundEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none grayscale'}`}>
                             <div className="flex justify-between text-sm text-slate-300">
                                 <span>{t('controls.volume')}</span>
                                 <span>{Math.round(settings.soundVolume * 100)}%</span>
@@ -332,7 +423,7 @@ const ClientSession: React.FC = () => {
                                 step="0.05"
                                 value={settings.soundVolume}
                                 onChange={(e) => updateSettings({ soundVolume: parseFloat(e.target.value) })}
-                                className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400"
                             />
                         </div>
                     </section>
@@ -344,8 +435,9 @@ const ClientSession: React.FC = () => {
                         </div>
                         <button 
                             onClick={() => setLanguage(language === 'en' ? 'zh-TW' : 'en')}
-                            className="w-full py-2 bg-slate-800 hover:bg-slate-700 rounded text-sm text-white transition-colors"
+                            className="w-full py-2 bg-slate-800 hover:bg-slate-700 rounded text-sm text-white transition-colors flex items-center justify-center gap-2 group"
                         >
+                             <Globe size={12} className="text-slate-400 group-hover:text-white transition-colors" />
                             {language === 'en' ? 'Switch to 繁體中文' : 'Switch to English'}
                         </button>
                     </section>
@@ -354,8 +446,8 @@ const ClientSession: React.FC = () => {
         </div>
       )}
       
-      <div className="absolute bottom-4 right-4 z-40">
-         <div className="w-2 h-2 rounded-full bg-green-500 opacity-50 shadow-[0_0_8px_rgba(34,197,94,0.8)]"></div>
+      <div className="absolute bottom-4 right-4 z-40 pointer-events-none">
+         <div className="w-2 h-2 rounded-full bg-green-500 opacity-50 shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse"></div>
       </div>
     </div>
   );

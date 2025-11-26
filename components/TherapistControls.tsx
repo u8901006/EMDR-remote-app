@@ -1,30 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import { EMDRSettings, MovementPattern } from '../types';
-import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe } from 'lucide-react';
+import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box } from 'lucide-react';
 import { PRESET_COLORS, PRESET_BG_COLORS } from '../constants';
 import { useBroadcastSession } from '../hooks/useBroadcastSession';
 import { SessionRole } from '../types';
 import { useLiveKitContext } from '../contexts/LiveKitContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
 
 interface TherapistControlsProps {
   settings: EMDRSettings;
   updateSettings: (settings: Partial<EMDRSettings>) => void;
+  onRequestSummary: (text: string) => void;
+}
+
+interface SavedPreset {
+  id: string;
+  name: string;
+  settings: Partial<EMDRSettings>;
 }
 
 const PRESET_DURATIONS = [0, 30, 60, 120, 300, 600];
 
-const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateSettings }) => {
+const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateSettings, onRequestSummary }) => {
   const { t, language, setLanguage } = useLanguage();
   const { clientStatus } = useBroadcastSession(SessionRole.THERAPIST);
   const { connect, disconnect, isConnecting, room } = useLiveKitContext();
+  const { isListening, transcript, startListening, stopListening, resetTranscript, hasBrowserSupport } = useVoiceRecognition(language);
   
   const [showVideoConfig, setShowVideoConfig] = useState(false);
+  const [showPresets, setShowPresets] = useState(false);
+  const [showTranscription, setShowTranscription] = useState(false);
   const [localGamepadConnected, setLocalGamepadConnected] = useState(false);
   
   const [localLiveKitUrl, setLocalLiveKitUrl] = useState(settings.liveKitUrl);
   const [localTherapistToken, setLocalTherapistToken] = useState(settings.liveKitTherapistToken);
   const [localClientToken, setLocalClientToken] = useState(settings.liveKitClientToken);
+  const [isCopied, setIsCopied] = useState(false);
+
+  // Preset State
+  const [presets, setPresets] = useState<SavedPreset[]>([]);
+  const [newPresetName, setNewPresetName] = useState('');
+
+  // Load presets on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('emdr-presets');
+    if (saved) {
+        try {
+            setPresets(JSON.parse(saved));
+        } catch (e) {
+            console.error("Failed to parse presets", e);
+        }
+    }
+  }, []);
 
   useEffect(() => { setLocalLiveKitUrl(settings.liveKitUrl); }, [settings.liveKitUrl]);
   useEffect(() => { setLocalTherapistToken(settings.liveKitTherapistToken); }, [settings.liveKitTherapistToken]);
@@ -41,6 +69,52 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
         liveKitClientToken: localClientToken
     });
     await connect(localLiveKitUrl, localTherapistToken);
+  };
+
+  const handleCopyInviteLink = () => {
+    const baseUrl = window.location.href.split('#')[0].replace(/\/$/, '');
+    const inviteBase = `${baseUrl}/#/client`;
+    
+    const params = new URLSearchParams();
+    if (localLiveKitUrl) params.append('url', localLiveKitUrl);
+    if (localClientToken) params.append('token', localClientToken);
+    
+    const inviteLink = `${inviteBase}?${params.toString()}`;
+    
+    navigator.clipboard.writeText(inviteLink).then(() => {
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+    });
+  };
+
+  // Preset Logic
+  const handleSavePreset = () => {
+      if (!newPresetName.trim()) return;
+
+      // Filter out connection details and temporary state
+      const { liveKitUrl, liveKitTherapistToken, liveKitClientToken, isPlaying, ...safeSettings } = settings;
+
+      const newPreset: SavedPreset = {
+          id: Date.now().toString(),
+          name: newPresetName.trim(),
+          settings: safeSettings
+      };
+
+      const updated = [...presets, newPreset];
+      setPresets(updated);
+      localStorage.setItem('emdr-presets', JSON.stringify(updated));
+      setNewPresetName('');
+  };
+
+  const handleLoadPreset = (preset: SavedPreset) => {
+      // Don't overwrite connection details
+      updateSettings({ ...preset.settings, isPlaying: false });
+  };
+
+  const handleDeletePreset = (id: string) => {
+      const updated = presets.filter(p => p.id !== id);
+      setPresets(updated);
+      localStorage.setItem('emdr-presets', JSON.stringify(updated));
   };
 
   useEffect(() => {
@@ -136,6 +210,132 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
             </div>
         </section>
 
+        {/* Voice Transcription */}
+        <section className="bg-slate-800/30 p-3 rounded-lg border border-slate-700/30">
+            <button 
+                onClick={() => setShowTranscription(!showTranscription)}
+                className="w-full flex items-center justify-between text-blue-400 font-medium text-sm uppercase tracking-wider"
+            >
+                <div className="flex items-center gap-2">
+                    {isListening ? <Mic size={14} className="text-red-500 animate-pulse" /> : <FileText size={14} />} 
+                    {t('transcription.title')}
+                </div>
+                {showTranscription ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+            
+            {showTranscription && (
+                <div className="space-y-3 mt-3 animate-in fade-in slide-in-from-top-2">
+                     {!hasBrowserSupport ? (
+                        <div className="text-xs text-red-400 text-center border border-red-500/30 p-2 rounded bg-red-900/10">
+                            {t('transcription.unsupported')}
+                        </div>
+                     ) : (
+                        <>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={isListening ? stopListening : startListening}
+                                    className={`flex-1 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-2 transition-colors ${
+                                        isListening 
+                                        ? 'bg-red-900/50 text-red-300 border border-red-500/50 hover:bg-red-900/70' 
+                                        : 'bg-slate-700 text-white hover:bg-slate-600'
+                                    }`}
+                                >
+                                    {isListening ? (
+                                        <><MicOff size={12} /> {t('transcription.stop')}</>
+                                    ) : (
+                                        <><Mic size={12} /> {t('transcription.start')}</>
+                                    )}
+                                </button>
+                                <button 
+                                    onClick={resetTranscript}
+                                    disabled={!transcript}
+                                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 hover:text-white disabled:opacity-50"
+                                    title={t('transcription.clear')}
+                                >
+                                    <Trash2 size={12} />
+                                </button>
+                            </div>
+
+                            <textarea 
+                                value={transcript}
+                                readOnly
+                                placeholder={t('transcription.placeholder')}
+                                className="w-full h-32 bg-slate-950 border border-slate-700 rounded p-2 text-xs text-slate-300 resize-none outline-none focus:border-blue-500/50 font-mono leading-relaxed"
+                            />
+
+                            <button 
+                                onClick={() => onRequestSummary(transcript)}
+                                disabled={!transcript || transcript.length < 10}
+                                className="w-full py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-xs font-bold rounded flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20"
+                            >
+                                <Sparkles size={12} /> {t('transcription.generateSoap')}
+                            </button>
+                        </>
+                     )}
+                </div>
+            )}
+        </section>
+        
+        {/* Session Presets */}
+        <section className="bg-slate-800/30 p-3 rounded-lg border border-slate-700/30">
+            <button 
+                onClick={() => setShowPresets(!showPresets)}
+                className="w-full flex items-center justify-between text-blue-400 font-medium text-sm uppercase tracking-wider"
+            >
+                <div className="flex items-center gap-2"><FolderHeart size={14} /> {t('presets.title')}</div>
+                {showPresets ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+
+            {showPresets && (
+                <div className="space-y-3 mt-3 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex gap-2">
+                        <input 
+                            type="text" 
+                            value={newPresetName}
+                            onChange={(e) => setNewPresetName(e.target.value)}
+                            placeholder={t('presets.namePlaceholder')}
+                            className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none"
+                            onKeyDown={(e) => e.key === 'Enter' && handleSavePreset()}
+                        />
+                        <button 
+                            onClick={handleSavePreset}
+                            disabled={!newPresetName.trim()}
+                            className="bg-blue-600 hover:bg-blue-500 text-white p-1.5 rounded disabled:opacity-50 transition-colors"
+                            title={t('presets.save')}
+                        >
+                            <Save size={14} />
+                        </button>
+                    </div>
+
+                    <div className="space-y-1 max-h-32 overflow-y-auto no-scrollbar">
+                        {presets.length === 0 ? (
+                            <div className="text-xs text-slate-500 italic text-center py-2">{t('presets.empty')}</div>
+                        ) : (
+                            presets.map(preset => (
+                                <div key={preset.id} className="group flex items-center justify-between p-2 rounded bg-slate-900/50 hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-colors">
+                                    <button 
+                                        onClick={() => handleLoadPreset(preset)}
+                                        className="text-xs text-slate-300 hover:text-white flex items-center gap-2 truncate flex-1 text-left"
+                                        title={t('presets.load')}
+                                    >
+                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                                        {preset.name}
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDeletePreset(preset.id)}
+                                        className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                        title={t('presets.delete')}
+                                    >
+                                        <Trash2 size={12} />
+                                    </button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </section>
+
         {/* Video Configuration */}
         <section className="bg-slate-800/30 p-3 rounded-lg border border-slate-700/30">
             <button 
@@ -189,14 +389,28 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
 
                     <div className="pt-2 border-t border-slate-700/50">
                         <label className="text-xs text-slate-400">{t('controls.clientToken')}</label>
-                        <input 
-                            type="text" 
-                            value={localClientToken}
-                            onChange={(e) => setLocalClientToken(e.target.value)}
-                            onBlur={() => updateSettings({ liveKitClientToken: localClientToken })}
-                            placeholder="Token..."
-                            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-[10px] text-slate-400 focus:border-blue-500 outline-none"
-                        />
+                        <div className="flex gap-2">
+                            <input 
+                                type="text" 
+                                value={localClientToken}
+                                onChange={(e) => setLocalClientToken(e.target.value)}
+                                onBlur={() => updateSettings({ liveKitClientToken: localClientToken })}
+                                placeholder="Token..."
+                                className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-[10px] text-slate-400 focus:border-blue-500 outline-none"
+                            />
+                        </div>
+                         <button 
+                            onClick={handleCopyInviteLink}
+                            disabled={!localLiveKitUrl || !localClientToken}
+                            className={`w-full mt-2 py-1.5 rounded text-[10px] font-medium flex items-center justify-center gap-1.5 transition-colors border ${
+                                isCopied 
+                                ? 'bg-green-900/30 border-green-500/50 text-green-300' 
+                                : 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-slate-200'
+                            }`}
+                        >
+                            {isCopied ? <Check size={12} /> : <Copy size={12} />}
+                            {isCopied ? t('controls.linkCopied') : t('controls.copyLink')}
+                        </button>
                     </div>
                 </div>
             )}
@@ -285,6 +499,45 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
             </div>
         </section>
 
+        {/* Visuals */}
+        <section className="space-y-4">
+            <div className="flex items-center gap-2 text-blue-400 font-medium text-sm uppercase tracking-wider">
+                <Palette size={14} /> {t('controls.visuals')}
+            </div>
+
+            <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                    <span className="text-sm">{t('controls.depth')}</span>
+                    <span className="text-[10px] text-slate-500">{t('controls.depthDesc')}</span>
+                </div>
+                <button
+                    onClick={() => updateSettings({ depthEnabled: !settings.depthEnabled })}
+                    className={`w-12 h-6 rounded-full transition-colors relative ${settings.depthEnabled ? 'bg-blue-600' : 'bg-slate-700'}`}
+                >
+                    <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.depthEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+            </div>
+
+            <div className="space-y-2">
+                <label className="text-sm">{t('controls.color')}</label>
+                <div className="flex gap-2 flex-wrap">
+                    {PRESET_COLORS.map(c => (
+                        <button key={c} onClick={() => updateSettings({ color: c })} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${settings.color === c ? 'border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: c }} />
+                    ))}
+                     <input type="color" value={settings.color} onChange={(e) => updateSettings({ color: e.target.value })} className="w-8 h-8 rounded-full p-0 overflow-hidden border-0 cursor-pointer" />
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <label className="text-sm">{t('controls.bg')}</label>
+                <div className="flex gap-2 flex-wrap">
+                    {PRESET_BG_COLORS.map(c => (
+                        <button key={c} onClick={() => updateSettings({ backgroundColor: c })} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${settings.backgroundColor === c ? 'border-white scale-110' : 'border-slate-700'}`} style={{ backgroundColor: c }} />
+                    ))}
+                </div>
+            </div>
+        </section>
+
         {/* Audio */}
         <section className="space-y-4">
             <div className="flex items-center gap-2 text-blue-400 font-medium text-sm uppercase tracking-wider">
@@ -360,32 +613,6 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
                         <Activity size={12} /> Test Rumble
                     </button>
                 )}
-            </div>
-        </section>
-
-        {/* Visuals */}
-        <section className="space-y-4">
-            <div className="flex items-center gap-2 text-blue-400 font-medium text-sm uppercase tracking-wider">
-                <Palette size={14} /> {t('controls.visuals')}
-            </div>
-
-            <div className="space-y-2">
-                <label className="text-sm">{t('controls.color')}</label>
-                <div className="flex gap-2 flex-wrap">
-                    {PRESET_COLORS.map(c => (
-                        <button key={c} onClick={() => updateSettings({ color: c })} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${settings.color === c ? 'border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: c }} />
-                    ))}
-                     <input type="color" value={settings.color} onChange={(e) => updateSettings({ color: e.target.value })} className="w-8 h-8 rounded-full p-0 overflow-hidden border-0 cursor-pointer" />
-                </div>
-            </div>
-
-            <div className="space-y-2">
-                <label className="text-sm">{t('controls.bg')}</label>
-                <div className="flex gap-2 flex-wrap">
-                    {PRESET_BG_COLORS.map(c => (
-                        <button key={c} onClick={() => updateSettings({ backgroundColor: c })} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${settings.backgroundColor === c ? 'border-white scale-110' : 'border-slate-700'}`} style={{ backgroundColor: c }} />
-                    ))}
-                </div>
             </div>
         </section>
 

@@ -22,6 +22,7 @@ export interface EMDRSettings {
   color: string;
   backgroundColor: string;
   pattern: MovementPattern;
+  depthEnabled: boolean; // 3D effect toggle
   
   // Audio
   soundEnabled: boolean;

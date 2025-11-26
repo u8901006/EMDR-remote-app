@@ -1,8 +1,4 @@
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { Language } from '../types';
-
-// Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
 const SYSTEM_INSTRUCTION = `You are an empathetic, professional clinical assistant for an EMDR therapist. 
 Your role is to assist the therapist by suggesting grounding techniques, summarizing session notes, or providing script suggestions for resource installation. 
@@ -14,39 +10,37 @@ export const generateAssistantResponse = async (
   history: { role: 'user' | 'model', text: string }[] = [],
   language: Language = 'en'
 ): Promise<string> => {
-  if (!process.env.API_KEY) {
-    return "API Key is missing. Please check your configuration.";
-  }
-
+  
   try {
-    const model = 'gemini-2.5-flash';
-    
     let languageInstruction = "";
     if (language === 'zh-TW') {
         languageInstruction = "IMPORTANT: Please reply in Traditional Chinese (繁體中文).";
     }
 
-    const fullPrompt = `
-      ${languageInstruction}
-      Context from previous interactions:
-      ${history.map(h => `${h.role}: ${h.text}`).join('\n')}
-      
-      Current Request: ${prompt}
-    `;
+    const payload = {
+      prompt: `${languageInstruction}\n${prompt}`,
+      history,
+      systemInstruction: SYSTEM_INSTRUCTION
+    };
 
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model,
-      contents: fullPrompt,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.7,
-      }
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
     });
 
-    return response.text || "I couldn't generate a response at this time.";
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.text || "I couldn't generate a response at this time.";
+
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    return "Sorry, I encountered an error connecting to the AI assistant.";
+    console.error("AI Service Error:", error);
+    return "Sorry, I encountered an error connecting to the AI assistant. Please ensure the backend is configured correctly.";
   }
 };
 
@@ -58,5 +52,6 @@ export const suggestGroundingTechnique = async (clientStateDescription: string, 
 
   const prompt = `Suggest a specific, brief grounding technique for a client who is currently experiencing: ${clientStateDescription}. 
   Provide the script the therapist can read directly to the client. ${langRequest}`;
+  
   return generateAssistantResponse(prompt, [], language);
 };

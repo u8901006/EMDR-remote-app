@@ -1,10 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Sparkles, Send, AlertCircle, FileText, User, X } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { generateAssistantResponse, suggestGroundingTechnique } from '../services/gemini';
 import { useLanguage } from '../contexts/LanguageContext';
 
-const AIAssistant: React.FC = () => {
+export interface AIAssistantHandle {
+    triggerPrompt: (text: string, mode?: 'chat' | 'summary') => void;
+}
+
+const AIAssistant = forwardRef<AIAssistantHandle>((props, ref) => {
   const { t, language } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
@@ -34,23 +38,24 @@ const AIAssistant: React.FC = () => {
     if (isOpen) scrollToBottom();
   }, [messages, isOpen]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSend = async (overrideText?: string) => {
+    const textToSend = overrideText || input;
+    if (!textToSend.trim()) return;
 
-    const userText = input;
     setInput(''); 
     setIsLoading(true);
+    setIsOpen(true);
 
     if (inputMode === 'grounding') {
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
             role: 'user',
-            text: `${t('ai.btn.grounding')}: ${userText}`,
+            text: `${t('ai.btn.grounding')}: ${textToSend}`,
             timestamp: new Date()
         };
         setMessages(prev => [...prev, userMsg]);
 
-        const responseText = await suggestGroundingTechnique(userText, language);
+        const responseText = await suggestGroundingTechnique(textToSend, language);
 
         const aiMsg: ChatMessage = {
             id: (Date.now() + 1).toString(),
@@ -64,12 +69,12 @@ const AIAssistant: React.FC = () => {
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
             role: 'user',
-            text: userText,
+            text: textToSend,
             timestamp: new Date()
         };
         setMessages(prev => [...prev, userMsg]);
 
-        const responseText = await generateAssistantResponse(userText, messages, language);
+        const responseText = await generateAssistantResponse(textToSend, messages, language);
 
         const aiMsg: ChatMessage = {
             id: (Date.now() + 1).toString(),
@@ -82,6 +87,20 @@ const AIAssistant: React.FC = () => {
     
     setIsLoading(false);
   };
+
+  // Expose methods to parent
+  useImperativeHandle(ref, () => ({
+      triggerPrompt: (text: string, mode: 'chat' | 'summary' = 'chat') => {
+          if (mode === 'summary') {
+              const summaryPrompt = language === 'zh-TW' 
+                ? `請根據以下療程逐字稿，生成一份專業的 SOAP 臨床筆記 (Subjective, Objective, Assessment, Plan)：\n\n${text}`
+                : `Please generate a professional SOAP note (Subjective, Objective, Assessment, Plan) based on the following session transcript:\n\n${text}`;
+              handleSend(summaryPrompt);
+          } else {
+              handleSend(text);
+          }
+      }
+  }));
 
   const handleQuickAction = async (action: 'grounding' | 'safe_place') => {
     if (action === 'grounding') {
@@ -113,7 +132,7 @@ const AIAssistant: React.FC = () => {
                     ? 'bg-blue-600 text-white rounded-br-none' 
                     : 'bg-slate-800 text-slate-200 rounded-bl-none border border-slate-700'
                 }`}>
-                  {msg.text}
+                  <div className="whitespace-pre-wrap">{msg.text}</div>
                 </div>
               </div>
             ))}
@@ -176,7 +195,7 @@ const AIAssistant: React.FC = () => {
                     autoFocus={inputMode === 'grounding'}
                 />
                 <button 
-                    onClick={handleSend}
+                    onClick={() => handleSend()}
                     disabled={isLoading || !input.trim()}
                     className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md transition-colors disabled:opacity-50"
                 >
@@ -203,6 +222,8 @@ const AIAssistant: React.FC = () => {
       </button>
     </div>
   );
-};
+});
+
+AIAssistant.displayName = 'AIAssistant';
 
 export default AIAssistant;

@@ -113,7 +113,7 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role }) => {
         // Draw center if paused
         const cx = canvas.width / 2;
         const cy = canvas.height / 2;
-        drawBall(ctx, cx, cy);
+        drawBall(ctx, cx, cy, 1, 1);
         // Keep loop running to handle resize, but don't increment time
         requestRef.current = requestAnimationFrame(animate);
         return;
@@ -189,22 +189,54 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role }) => {
         break;
     }
 
-    drawBall(ctx, x, y);
+    // 3D Depth Logic
+    let scale = 1;
+    let opacity = 1.0;
+    
+    if (settings.depthEnabled) {
+        // Use Math.cos(t) to be 90 degrees out of phase with the standard Sin(t) used for X-axis.
+        // This effectively creates a circular/elliptical path in the X-Z plane.
+        // 1 = Near, -1 = Far
+        const depthPhase = Math.cos(t); 
+        
+        // Scale Mapping:
+        // Far (-1) -> 0.6
+        // Near (1) -> 1.4
+        // Formula: 1.0 + (depth * 0.4)
+        scale = 1.0 + (depthPhase * 0.4);
+        
+        // Opacity Mapping:
+        // Far (-1) -> 0.6
+        // Near (1) -> 1.0
+        // Normalized depth (0 to 1): (depth + 1) / 2
+        opacity = 0.6 + (0.4 * ((depthPhase + 1) / 2));
+    }
+
+    drawBall(ctx, x, y, scale, opacity);
 
     requestRef.current = requestAnimationFrame(animate);
   };
 
-  const drawBall = (ctx: CanvasRenderingContext2D, x: number, y: number) => {
+  const drawBall = (ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, opacity: number) => {
+    ctx.save();
+    
+    const size = settings.size * scale;
+    ctx.globalAlpha = opacity;
+    
     ctx.beginPath();
-    ctx.arc(x, y, settings.size / 2, 0, 2 * Math.PI);
+    ctx.arc(x, y, size / 2, 0, 2 * Math.PI);
     ctx.fillStyle = settings.color;
     ctx.fill();
     
-    // Optional: Add a subtle glow
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = settings.color;
-    ctx.fill();
-    ctx.shadowBlur = 0; // reset
+    // Glow effect - also scaled
+    if (opacity > 0.8) {
+        ctx.shadowBlur = 20 * scale;
+        ctx.shadowColor = settings.color;
+        ctx.fill();
+        ctx.shadowBlur = 0; 
+    }
+    
+    ctx.restore();
   };
 
   useEffect(() => {

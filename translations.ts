@@ -34,6 +34,8 @@ export const translations: Record<Language, any> = {
     "controls.serverUrl": "Server URL",
     "controls.therapistToken": "Therapist Token",
     "controls.clientToken": "Client Token (Share this)",
+    "controls.copyLink": "Copy Invite Link",
+    "controls.linkCopied": "Copied!",
     "controls.timer": "Timer",
     "controls.motion": "Motion",
     "controls.speed": "Speed",
@@ -50,6 +52,26 @@ export const translations: Record<Language, any> = {
     "controls.visuals": "Visuals",
     "controls.color": "Ball Color",
     "controls.bg": "Background",
+    "controls.depth": "3D Depth",
+    "controls.depthDesc": "Simulate distance change",
+
+    // Presets
+    "presets.title": "Session Presets",
+    "presets.save": "Save Preset",
+    "presets.load": "Load",
+    "presets.namePlaceholder": "Preset Name (e.g., Child Anxiety)",
+    "presets.empty": "No saved presets",
+    "presets.delete": "Delete",
+    "presets.create": "Create New",
+
+    // Transcription
+    "transcription.title": "Transcription & Notes",
+    "transcription.start": "Start Recording",
+    "transcription.stop": "Stop Recording",
+    "transcription.clear": "Clear Text",
+    "transcription.placeholder": "Real-time session transcript will appear here...",
+    "transcription.generateSoap": "Generate SOAP Note",
+    "transcription.unsupported": "Browser Not Supported",
     
     // Patterns
     "pattern.linear": "Linear",
@@ -62,6 +84,9 @@ export const translations: Record<Language, any> = {
     // Client Session
     "client.join": "Join Session",
     "client.join.desc": "Enter connection details provided by your therapist.",
+    "client.tokenLabel": "Session Token",
+    "client.advanced": "Advanced Connection Settings",
+    "client.autoConnecting": "Auto-connecting via invite link...",
     "client.preferences": "Preferences",
     "client.localAdjust": "Local adjustments (volume, colors) can be made here. Therapist controls motion.",
     
@@ -108,6 +133,8 @@ export const translations: Record<Language, any> = {
     "controls.serverUrl": "伺服器網址",
     "controls.therapistToken": "治療師金鑰 (Token)",
     "controls.clientToken": "個案金鑰 (分享此金鑰)",
+    "controls.copyLink": "複製邀請連結",
+    "controls.linkCopied": "已複製！",
     "controls.timer": "計時器",
     "controls.motion": "動態設定",
     "controls.speed": "速度",
@@ -124,6 +151,26 @@ export const translations: Record<Language, any> = {
     "controls.visuals": "視覺設定",
     "controls.color": "光球顏色",
     "controls.bg": "背景顏色",
+    "controls.depth": "3D 深度模擬",
+    "controls.depthDesc": "模擬遠近距離變化",
+
+    // Presets
+    "presets.title": "設定檔預設",
+    "presets.save": "儲存設定",
+    "presets.load": "載入",
+    "presets.namePlaceholder": "設定檔名稱 (如：兒童焦慮)",
+    "presets.empty": "無儲存的設定檔",
+    "presets.delete": "刪除",
+    "presets.create": "建立新設定",
+
+    // Transcription
+    "transcription.title": "語音轉錄與筆記",
+    "transcription.start": "開始錄音",
+    "transcription.stop": "停止錄音",
+    "transcription.clear": "清除文字",
+    "transcription.placeholder": "即時療程對話將顯示於此...",
+    "transcription.generateSoap": "生成 SOAP 臨床筆記",
+    "transcription.unsupported": "瀏覽器不支援",
 
     // Patterns
     "pattern.linear": "水平移動 (Linear)",
@@ -136,6 +183,9 @@ export const translations: Record<Language, any> = {
     // Client Session
     "client.join": "加入療程",
     "client.join.desc": "請輸入治療師提供的連線資訊。",
+    "client.tokenLabel": "療程金鑰 (Token)",
+    "client.advanced": "進階連線設定 (伺服器)",
+    "client.autoConnecting": "偵測到邀請連結，正在自動連線...",
     "client.preferences": "偏好設定",
     "client.localAdjust": "您可以在此調整本地設定 (音量、顏色)。動態速度由治療師控制。",
 
