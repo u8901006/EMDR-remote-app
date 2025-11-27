@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useState } from 'react';
-import { EMDRSettings, MovementPattern, SessionRole, VisualTheme, AudioMode } from '../types';
+import { EMDRSettings, MovementPattern, SessionRole, VisualTheme, AudioMode, DualAttentionMode } from '../types';
 
 interface EMDRCanvasProps {
   settings: EMDRSettings;
@@ -15,6 +15,8 @@ interface Star {
   size: number;
 }
 
+const TASK_COLORS = ['#ef4444', '#22c55e', '#3b82f6', '#eab308']; // Red, Green, Blue, Yellow
+
 const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComplete }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(0);
@@ -27,6 +29,9 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevCosRef = useRef<number>(0); // Tracks the derivative to detect peaks
   
+  // Dual Attention Refs
+  const taskValueRef = useRef<string | null>(null);
+
   // Background Audio Nodes
   const bgNodesRef = useRef<any[]>([]); // Keep track of active nodes to stop them
 
@@ -70,6 +75,7 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
   useEffect(() => {
     if (settings.isPlaying) {
       currentPassesRef.current = 0;
+      taskValueRef.current = null; // Reset task
     }
   }, [settings.isPlaying]);
 
@@ -102,6 +108,7 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
     const bufferSize = 2 * ctx.sampleRate; // 2 seconds
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const output = buffer.getChannelData(0);
+    let lastOut = 0;
     for (let i = 0; i < bufferSize; i++) {
         // Pink noise approx:
         const white = Math.random() * 2 - 1;
@@ -111,7 +118,6 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
     }
     return buffer;
   };
-  let lastOut = 0;
 
   const startBackgroundAudio = () => {
      if (!settings.soundEnabled || !audioCtxRef.current || settings.audioMode === AudioMode.NONE) {
@@ -433,23 +439,37 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
         return;
     }
     
-    // --- AUDIO & HAPTIC SYNC ---
+    // --- AUDIO & HAPTIC SYNC & COGNITIVE TASK ---
     const cosT = Math.cos(t);
     const prevCos = prevCosRef.current;
+    const isPeak = (prevCos > 0 && cosT <= 0) || (prevCos < 0 && cosT >= 0);
 
-    // Trigger on peak detection
-    if (prevCos > 0 && cosT <= 0) {
-        playTone(1);
-        triggerHaptics('right');
-    } else if (prevCos < 0 && cosT >= 0) {
-        playTone(-1);
-        triggerHaptics('left');
-        
-        // Pass Counting Logic
-        if (settings.targetPasses > 0) {
-            currentPassesRef.current += 1;
-            if (currentPassesRef.current >= settings.targetPasses) {
-                if (onSessionComplete) onSessionComplete();
+    if (isPeak) {
+        // 1. Play Tone & Haptic
+        const pan = (prevCos > 0 && cosT <= 0) ? 1 : -1;
+        playTone(pan);
+        triggerHaptics(pan === 1 ? 'right' : 'left');
+
+        // 2. Dual Attention (Update value on peak)
+        if (settings.dualAttentionMode === DualAttentionMode.COLOR_NAMING) {
+            // Pick a random distinct color that isn't the current one (mostly)
+            const randomColor = TASK_COLORS[Math.floor(Math.random() * TASK_COLORS.length)];
+            taskValueRef.current = randomColor;
+        } else if (settings.dualAttentionMode === DualAttentionMode.NUMBERS) {
+            // Pick random number 1-9
+            const num = Math.floor(Math.random() * 9) + 1;
+            taskValueRef.current = num.toString();
+        } else {
+            taskValueRef.current = null;
+        }
+
+        // 3. Pass Counting
+        if (prevCos < 0 && cosT >= 0) { // Count on Left return (one cycle)
+            if (settings.targetPasses > 0) {
+                currentPassesRef.current += 1;
+                if (currentPassesRef.current >= settings.targetPasses) {
+                    if (onSessionComplete) onSessionComplete();
+                }
             }
         }
     }
@@ -513,15 +533,35 @@ const EMDRCanvas: React.FC<EMDRCanvasProps> = ({ settings, role, onSessionComple
     
     ctx.beginPath();
     ctx.arc(x, y, size / 2, 0, 2 * Math.PI);
-    ctx.fillStyle = settings.color;
+    
+    // Determine Color
+    let fillStyle = settings.color;
+    if (settings.dualAttentionMode === DualAttentionMode.COLOR_NAMING && taskValueRef.current) {
+        fillStyle = taskValueRef.current;
+    }
+    ctx.fillStyle = fillStyle;
     ctx.fill();
     
     // Glow effect
     if (opacity > 0.8) {
         ctx.shadowBlur = 20 * scale;
-        ctx.shadowColor = settings.color;
+        ctx.shadowColor = fillStyle;
         ctx.fill();
         ctx.shadowBlur = 0; 
+    }
+
+    // Draw Number Text if mode is NUMBERS
+    if (settings.dualAttentionMode === DualAttentionMode.NUMBERS && taskValueRef.current) {
+        ctx.fillStyle = '#ffffff';
+        // Ensure contrast. If ball is white, make text black
+        if (fillStyle === '#ffffff') ctx.fillStyle = '#000000';
+        
+        ctx.font = `bold ${size * 0.6}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.fillText(taskValueRef.current, x, y);
     }
     
     ctx.restore();

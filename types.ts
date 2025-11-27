@@ -31,6 +31,12 @@ export enum AudioMode {
   OCEAN = 'OCEAN'
 }
 
+export enum DualAttentionMode {
+  NONE = 'NONE',
+  COLOR_NAMING = 'COLOR_NAMING', // Ball changes color randomly
+  NUMBERS = 'NUMBERS' // Random numbers 1-9 appear inside ball
+}
+
 export type Language = 'en' | 'zh-TW';
 
 export type EmotionType = 'JOY' | 'SADNESS' | 'FEAR' | 'CALM';
@@ -48,6 +54,7 @@ export interface EMDRSettings {
   backgroundColor: string;
   pattern: MovementPattern;
   depthEnabled: boolean; // 3D effect toggle
+  dualAttentionMode: DualAttentionMode; // Cognitive Interweave
   
   // Visual Themes
   theme: VisualTheme;

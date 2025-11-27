@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { EMDRSettings, MovementPattern, VisualTheme, MetricType, SessionMetric, EmotionType, AudioMode } from '../types';
-import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp, Smile, Frown, Meh, AlertOctagon, BookOpen, MonitorUp, MonitorOff, Music } from 'lucide-react';
-import { PRESET_COLORS, PRESET_BG_COLORS, EMDR_SCRIPTS } from '../constants';
+import { EMDRSettings, MovementPattern, VisualTheme, MetricType, SessionMetric, EmotionType, AudioMode, DualAttentionMode } from '../types';
+import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp, Smile, Frown, Meh, AlertOctagon, Music, BrainCircuit } from 'lucide-react';
+import { PRESET_COLORS, PRESET_BG_COLORS } from '../constants';
 import { useBroadcastSession } from '../hooks/useBroadcastSession';
 import { SessionRole } from '../types';
 import { useLiveKitContext } from '../contexts/LiveKitContext';
@@ -14,7 +14,7 @@ interface TherapistControlsProps {
   updateSettings: (settings: Partial<EMDRSettings>) => void;
   onRequestSummary: (text: string) => void;
   latestSummary?: string; // Generated AI summary passed down from parent
-  onUpdateTeleprompter: (text: string | null) => void;
+  className?: string;
 }
 
 interface SavedPreset {
@@ -80,7 +80,7 @@ const EmotionIcon: React.FC<{ type: EmotionType }> = ({ type }) => {
     }
 };
 
-const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateSettings, onRequestSummary, latestSummary, onUpdateTeleprompter }) => {
+const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateSettings, onRequestSummary, latestSummary, className }) => {
   const { t, language, setLanguage } = useLanguage();
   const { clientStatus, requestMetric, metrics } = useBroadcastSession(SessionRole.THERAPIST);
   const { connect, disconnect, isConnecting, room } = useLiveKitContext();
@@ -90,21 +90,16 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   const [showPresets, setShowPresets] = useState(false);
   const [showTranscription, setShowTranscription] = useState(false);
   const [showAssessment, setShowAssessment] = useState(true);
-  const [showScripts, setShowScripts] = useState(false);
   const [localGamepadConnected, setLocalGamepadConnected] = useState(false);
   
-  const [localLiveKitUrl, setLocalLiveKitUrl] = useState(settings.liveKitUrl);
-  const [localTherapistToken, setLocalTherapistToken] = useState(settings.liveKitTherapistToken);
-  const [localClientToken, setLocalClientToken] = useState(settings.liveKitClientToken);
+  // New State for Token Generation
+  const [roomName, setRoomName] = useState(`session-${Math.floor(Math.random() * 10000)}`);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
   // Preset State
   const [presets, setPresets] = useState<SavedPreset[]>([]);
   const [newPresetName, setNewPresetName] = useState('');
-
-  // Script State
-  const [scriptContent, setScriptContent] = useState('');
-  const [isTeleprompterActive, setIsTeleprompterActive] = useState(false);
 
   // Stats for Report
   const sessionStartTime = useRef<number>(Date.now());
@@ -172,29 +167,41 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
         }
     }
   }, []);
-
-  useEffect(() => { setLocalLiveKitUrl(settings.liveKitUrl); }, [settings.liveKitUrl]);
-  useEffect(() => { setLocalTherapistToken(settings.liveKitTherapistToken); }, [settings.liveKitTherapistToken]);
-  useEffect(() => { setLocalClientToken(settings.liveKitClientToken); }, [settings.liveKitClientToken]);
   
-  const handleConnect = async () => {
-    updateSettings({
-        liveKitUrl: localLiveKitUrl,
-        liveKitTherapistToken: localTherapistToken,
-        liveKitClientToken: localClientToken
-    });
-    await connect(localLiveKitUrl, localTherapistToken);
+  const handleStartSession = async () => {
+    setIsGenerating(true);
+    try {
+        const res = await fetch('/api/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                roomName,
+                participantName: 'Therapist',
+                role: 'THERAPIST'
+            })
+        });
+        
+        const data = await res.json();
+        
+        if (data.token && data.url) {
+            updateSettings({ liveKitUrl: data.url });
+            await connect(data.url, data.token);
+        } else {
+            console.error("Failed to get token", data);
+            alert("Could not generate session token. Check API configuration.");
+        }
+    } catch (e) {
+        console.error("Error starting session", e);
+        alert("Network error starting session.");
+    } finally {
+        setIsGenerating(false);
+    }
   };
 
   const handleCopyInviteLink = () => {
     const baseUrl = window.location.href.split('#')[0].replace(/\/$/, '');
-    const inviteBase = `${baseUrl}/#/client`;
-    
-    const params = new URLSearchParams();
-    if (localLiveKitUrl) params.append('url', localLiveKitUrl);
-    if (localClientToken) params.append('token', localClientToken);
-    
-    const inviteLink = `${inviteBase}?${params.toString()}`;
+    // Only append Room Name, not token
+    const inviteLink = `${baseUrl}/#/client?room=${encodeURIComponent(roomName)}`;
     
     navigator.clipboard.writeText(inviteLink).then(() => {
         setIsCopied(true);
@@ -232,33 +239,6 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
       localStorage.setItem('emdr-presets', JSON.stringify(updated));
   };
 
-  // Script Logic
-  const handleLoadScript = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const scriptId = e.target.value;
-      const script = EMDR_SCRIPTS.find(s => s.id === scriptId);
-      if (script) {
-          const content = language === 'zh-TW' ? script.content['zh-TW'] : script.content.en;
-          setScriptContent(content);
-      }
-  };
-
-  const toggleTeleprompter = () => {
-      if (isTeleprompterActive) {
-          setIsTeleprompterActive(false);
-          onUpdateTeleprompter(null);
-      } else {
-          setIsTeleprompterActive(true);
-          onUpdateTeleprompter(scriptContent || "Please enter script text...");
-      }
-  };
-
-  // Update teleprompter live if active
-  useEffect(() => {
-      if (isTeleprompterActive) {
-          onUpdateTeleprompter(scriptContent);
-      }
-  }, [scriptContent, isTeleprompterActive, onUpdateTeleprompter]);
-
   useEffect(() => {
     const intervalId = setInterval(() => {
         const gps = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -279,6 +259,10 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
 
   const handleAudioModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       updateSettings({ audioMode: e.target.value as AudioMode });
+  };
+  
+  const handleDualAttentionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      updateSettings({ dualAttentionMode: e.target.value as DualAttentionMode });
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -366,20 +350,8 @@ ${t('report.generated')}
   };
 
   return (
-    <div className="bg-slate-900 border-r border-slate-800 h-screen w-80 flex flex-col text-slate-300 overflow-hidden">
-      <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-        <h2 className="font-bold text-lg text-white tracking-wide">MindSync Control</h2>
-        <div className="flex items-center gap-2">
-             {clientStatus?.isFrozen && settings.isPlaying ? (
-                <div className="animate-pulse text-red-500" title="Client Gaze Frozen">
-                    <AlertTriangle size={18} />
-                </div>
-             ) : null}
-             <div className={`h-2 w-2 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)] ${room ? 'bg-green-500' : 'bg-slate-700'}`} title={room ? "Online" : "Offline"}></div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-5 space-y-8 no-scrollbar">
+    <div className={`bg-slate-900 flex flex-col text-slate-300 overflow-hidden ${className}`}>
+      <div className="flex-1 overflow-y-auto p-5 space-y-8 custom-scrollbar">
         
         {/* Client Monitor */}
         <section className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
@@ -479,60 +451,6 @@ ${t('report.generated')}
                             </button>
                         </div>
                         <Sparkline data={metrics} type="VOC" color="#22c55e" max={7} />
-                    </div>
-                </div>
-            )}
-        </section>
-
-        {/* Script Teleprompter */}
-        <section className="bg-slate-800/30 p-3 rounded-lg border border-slate-700/30">
-            <button 
-                onClick={() => setShowScripts(!showScripts)}
-                className="w-full flex items-center justify-between text-blue-400 font-medium text-sm uppercase tracking-wider"
-            >
-                <div className="flex items-center gap-2"><BookOpen size={14} /> {t('scripts.title')}</div>
-                {showScripts ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
-
-            {showScripts && (
-                <div className="space-y-3 mt-3 animate-in fade-in slide-in-from-top-2">
-                    <select 
-                        onChange={handleLoadScript}
-                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white outline-none"
-                    >
-                        <option value="">{t('scripts.select')}</option>
-                        {EMDR_SCRIPTS.map(s => (
-                            <option key={s.id} value={s.id}>
-                                {language === 'zh-TW' ? s.title['zh-TW'] : s.title.en}
-                            </option>
-                        ))}
-                    </select>
-
-                    <textarea
-                        value={scriptContent}
-                        onChange={(e) => setScriptContent(e.target.value)}
-                        placeholder={t('scripts.placeholder')}
-                        className="w-full h-32 bg-slate-950 border border-slate-700 rounded p-2 text-xs text-slate-300 resize-none outline-none focus:border-blue-500/50 leading-relaxed"
-                    />
-
-                    <div className="flex gap-2">
-                        <button 
-                            onClick={() => onRequestSummary(`${t('scripts.contextPrompt')} ${scriptContent || 'Trauma Processing'}`)}
-                            className="flex-1 py-1.5 bg-purple-900/30 hover:bg-purple-900/50 text-purple-200 border border-purple-500/30 text-xs font-bold rounded flex items-center justify-center gap-2 transition-colors"
-                        >
-                            <Sparkles size={12} /> {t('scripts.aiPrompt')}
-                        </button>
-                        <button 
-                            onClick={toggleTeleprompter}
-                            className={`flex-1 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-2 transition-colors border ${
-                                isTeleprompterActive 
-                                ? 'bg-blue-600 text-white border-blue-500' 
-                                : 'bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600'
-                            }`}
-                        >
-                            {isTeleprompterActive ? <MonitorOff size={12} /> : <MonitorUp size={12} />}
-                            {isTeleprompterActive ? t('scripts.hide') : t('scripts.project')}
-                        </button>
                     </div>
                 </div>
             )}
@@ -645,7 +563,7 @@ ${t('report.generated')}
                         </button>
                     </div>
 
-                    <div className="space-y-1 max-h-32 overflow-y-auto no-scrollbar">
+                    <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
                         {presets.length === 0 ? (
                             <div className="text-xs text-slate-500 italic text-center py-2">{t('presets.empty')}</div>
                         ) : (
@@ -687,34 +605,32 @@ ${t('report.generated')}
             {showVideoConfig && (
                 <div className="space-y-3 mt-3 animate-in fade-in slide-in-from-top-2">
                     <div className="space-y-1">
-                        <label className="text-xs text-slate-400">{t('controls.serverUrl')}</label>
-                        <input 
-                            type="text" 
-                            value={localLiveKitUrl}
-                            onChange={(e) => setLocalLiveKitUrl(e.target.value)}
-                            placeholder="wss://..."
-                            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none"
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs text-slate-400">{t('controls.therapistToken')}</label>
-                        <input 
-                            type="password" 
-                            value={localTherapistToken}
-                            onChange={(e) => setLocalTherapistToken(e.target.value)}
-                            placeholder="Token..."
-                            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none"
-                        />
+                        <label className="text-xs text-slate-400">{t('controls.roomName')}</label>
+                        <div className="flex gap-2">
+                             <input 
+                                type="text" 
+                                value={roomName}
+                                onChange={(e) => setRoomName(e.target.value)}
+                                className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none"
+                            />
+                            <button 
+                                onClick={() => setRoomName(`session-${Math.floor(Math.random() * 10000)}`)}
+                                className="px-2 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs"
+                                title="Randomize"
+                            >
+                                <Repeat size={12} />
+                            </button>
+                        </div>
                     </div>
                     
                     {!room ? (
                         <button 
-                            onClick={handleConnect}
-                            disabled={isConnecting}
+                            onClick={handleStartSession}
+                            disabled={isGenerating || isConnecting || !roomName}
                             className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                         >
-                            {isConnecting ? <Loader2 size={14} className="animate-spin" /> : <LinkIcon size={14} />}
-                            {isConnecting ? t('common.connecting') : t('common.connect')}
+                            {isGenerating || isConnecting ? <Loader2 size={14} className="animate-spin" /> : <LinkIcon size={14} />}
+                            {isGenerating ? t('common.generating') : t('common.connect')}
                         </button>
                     ) : (
                         <button 
@@ -725,21 +641,9 @@ ${t('report.generated')}
                         </button>
                     )}
 
-                    <div className="pt-2 border-t border-slate-700/50">
-                        <label className="text-xs text-slate-400">{t('controls.clientToken')}</label>
-                        <div className="flex gap-2">
-                            <input 
-                                type="text" 
-                                value={localClientToken}
-                                onChange={(e) => setLocalClientToken(e.target.value)}
-                                onBlur={() => updateSettings({ liveKitClientToken: localClientToken })}
-                                placeholder="Token..."
-                                className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-[10px] text-slate-400 focus:border-blue-500 outline-none"
-                            />
-                        </div>
+                    {room && (
                          <button 
                             onClick={handleCopyInviteLink}
-                            disabled={!localLiveKitUrl || !localClientToken}
                             className={`w-full mt-2 py-1.5 rounded text-[10px] font-medium flex items-center justify-center gap-1.5 transition-colors border ${
                                 isCopied 
                                 ? 'bg-green-900/30 border-green-500/50 text-green-300' 
@@ -749,7 +653,7 @@ ${t('report.generated')}
                             {isCopied ? <Check size={12} /> : <Copy size={12} />}
                             {isCopied ? t('controls.linkCopied') : t('controls.copyLink')}
                         </button>
-                    </div>
+                    )}
                 </div>
             )}
         </section>
@@ -877,6 +781,23 @@ ${t('report.generated')}
                     <option value={MovementPattern.VERTICAL}>{t('pattern.vertical')}</option>
                     <option value={MovementPattern.ALTERNATED}>{t('pattern.alternated')}</option>
                     <option value={MovementPattern.RANDOM}>{t('pattern.random')}</option>
+                </select>
+            </div>
+
+            {/* Cognitive Interweave / Dual Attention */}
+            <div className="pt-2 border-t border-slate-700/50">
+                <label className="text-sm flex items-center gap-2 mb-1 text-purple-300">
+                    <BrainCircuit size={14} />
+                    {t('controls.dualAttention')}
+                </label>
+                <select 
+                    value={settings.dualAttentionMode} 
+                    onChange={handleDualAttentionChange} 
+                    className="w-full bg-slate-950 border border-slate-700 rounded-md p-2 text-white outline-none text-xs"
+                >
+                    <option value={DualAttentionMode.NONE}>{t('da.none')}</option>
+                    <option value={DualAttentionMode.COLOR_NAMING}>{t('da.color')}</option>
+                    <option value={DualAttentionMode.NUMBERS}>{t('da.numbers')}</option>
                 </select>
             </div>
         </section>
@@ -1032,7 +953,7 @@ ${t('report.generated')}
                         </label>
                         <select 
                             value={settings.audioMode} 
-                            onChange={(e) => updateSettings({ audioMode: e.target.value as AudioMode })} 
+                            onChange={handleAudioModeChange} 
                             className="w-full bg-slate-950 border border-slate-700 rounded-md p-2 text-white outline-none text-xs"
                         >
                             <option value={AudioMode.NONE}>{t('audio.none')}</option>

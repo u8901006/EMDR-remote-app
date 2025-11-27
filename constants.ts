@@ -1,5 +1,5 @@
 
-import { EMDRSettings, MovementPattern, VisualTheme, AudioMode } from './types';
+import { EMDRSettings, MovementPattern, VisualTheme, AudioMode, DualAttentionMode } from './types';
 
 export const DEFAULT_SETTINGS: EMDRSettings = {
   isPlaying: false,
@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS: EMDRSettings = {
   backgroundColor: '#020617', // Slate-950
   pattern: MovementPattern.LINEAR,
   depthEnabled: false,
+  dualAttentionMode: DualAttentionMode.NONE,
   
   theme: VisualTheme.STANDARD,
   customImageUrl: '',

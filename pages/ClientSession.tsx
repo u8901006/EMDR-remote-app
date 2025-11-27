@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Maximize, Minimize, ArrowLeft, Loader2, Settings2, X, Clock, Sliders, Volume2, VolumeX, Gamepad2, Palette, Link as LinkIcon, AlertCircle, Globe, Video, Activity, ChevronDown, ChevronRight, CheckCircle2, Music, Upload } from 'lucide-react';
@@ -40,28 +41,65 @@ const ClientSession: React.FC = () => {
       if (pendingMetricRequest === 'VOC') setMetricValue(4);
   }, [pendingMetricRequest]);
 
+  // Logic to fetch token if room is in URL
+  const fetchTokenAndConnect = async (roomName: string) => {
+    try {
+        const res = await fetch('/api/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                roomName,
+                participantName: `Client-${Math.floor(Math.random() * 1000)}`,
+                role: 'CLIENT'
+            })
+        });
+        const data = await res.json();
+        if (data.token && data.url) {
+            updateSettings({ liveKitUrl: data.url });
+            await connect(data.url, data.token);
+        } else {
+            console.error("Failed to fetch token", data);
+        }
+    } catch (e) {
+        console.error("Error fetching token", e);
+    }
+  };
+
   // Load URL parameters and auto-connect
   useEffect(() => {
     const urlParam = searchParams.get('url');
     const tokenParam = searchParams.get('token');
+    const roomParam = searchParams.get('room');
 
-    if (urlParam && tokenParam && !room && !isConnecting && !autoConnectAttempted.current) {
+    if (!room && !isConnecting && !autoConnectAttempted.current) {
         autoConnectAttempted.current = true;
-        
-        setUrlInput(urlParam);
-        setTokenInput(tokenParam);
         setIsAutoConnecting(true);
-        
-        const newParams = new URLSearchParams(searchParams);
-        newParams.delete('url');
-        newParams.delete('token');
-        setSearchParams(newParams, { replace: true });
 
-        connect(urlParam, tokenParam).catch((err) => {
-             console.error("Auto-connect failed:", err);
-        }).finally(() => {
+        // Case 1: Legacy Token/URL params
+        if (urlParam && tokenParam) {
+            setUrlInput(urlParam);
+            setTokenInput(tokenParam);
+            
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete('url');
+            newParams.delete('token');
+            setSearchParams(newParams, { replace: true });
+
+            connect(urlParam, tokenParam).catch((err) => {
+                 console.error("Auto-connect failed:", err);
+            }).finally(() => {
+                setIsAutoConnecting(false);
+            });
+        } 
+        // Case 2: Room Name (Fetch Token from Backend)
+        else if (roomParam) {
+             fetchTokenAndConnect(roomParam).finally(() => {
+                 setIsAutoConnecting(false);
+             });
+        }
+        else {
             setIsAutoConnecting(false);
-        });
+        }
     }
   }, [searchParams, room, isConnecting, connect, setSearchParams]);
 

@@ -3,6 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Monitor, Activity, Globe } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import PWAInstallPrompt from '../components/PWAInstallPrompt';
 
 const Landing: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
@@ -17,9 +18,17 @@ const Landing: React.FC = () => {
       </div>
 
       <div className="z-10 max-w-5xl w-full text-center space-y-12">
-        <div>
-            <h1 className="text-7xl md:text-8xl font-bold text-white mb-6 tracking-tight">MindSync <span className="text-blue-500">EMDR</span></h1>
-            <p className="text-slate-400 text-3xl md:text-4xl">{t('app.subtitle')}</p>
+        
+        {/* Header with PWA Button */}
+        <div className="relative">
+             <div className="absolute top-0 right-0 hidden md:block">
+                 <PWAInstallPrompt />
+             </div>
+             <h1 className="text-7xl md:text-8xl font-bold text-white mb-6 tracking-tight">MindSync <span className="text-blue-500">EMDR</span></h1>
+             <p className="text-slate-400 text-3xl md:text-4xl">{t('app.subtitle')}</p>
+             <div className="mt-4 md:hidden flex justify-center">
+                 <PWAInstallPrompt />
+             </div>
         </div>
 
         <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 p-8 rounded-2xl text-left shadow-2xl">

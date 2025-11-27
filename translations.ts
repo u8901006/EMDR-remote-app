@@ -15,7 +15,8 @@ export const translations: Record<Language, any> = {
     "role.therapist.desc": "Control session parameters, access AI tools, and monitor settings.",
     "role.client": "Client View",
     "role.client.desc": "Enter fullscreen distraction-free mode for processing.",
-    "common.connect": "Connect",
+    "common.connect": "Start Session",
+    "common.generating": "Generating Room...",
     "common.disconnect": "Disconnect",
     "common.connecting": "Connecting...",
     "common.waiting": "Waiting...",
@@ -26,6 +27,14 @@ export const translations: Record<Language, any> = {
     "common.submit": "Submit Score",
     "common.cancel": "Cancel",
     
+    // PWA
+    "pwa.install": "Install App",
+    "pwa.ios.title": "Install on iOS",
+    "pwa.ios.step1": "Tap the Share button",
+    "pwa.ios.step2": "Select 'Add to Home Screen'",
+    "pwa.ios.step3": "Tap 'Add' to finish",
+    "pwa.installed": "App Installed",
+
     // Therapist Controls
     "controls.clientMonitor": "Client Monitor",
     "controls.sensor": "Sensor",
@@ -35,6 +44,7 @@ export const translations: Record<Language, any> = {
     "controls.sensitivity": "Sensitivity",
     "controls.videoSetup": "Connection Setup",
     "controls.serverUrl": "Server URL",
+    "controls.roomName": "Room Name",
     "controls.therapistToken": "Therapist Token",
     "controls.clientToken": "Client Token (Share this)",
     "controls.copyLink": "Copy Invite Link",
@@ -63,7 +73,13 @@ export const translations: Record<Language, any> = {
     "controls.bg": "Background",
     "controls.depth": "3D Depth",
     "controls.depthDesc": "Simulate distance change",
+    "controls.dualAttention": "Taxing Working Memory",
     
+    // Dual Attention
+    "da.none": "None",
+    "da.color": "Color Naming Task",
+    "da.numbers": "Random Numbers (Math)",
+
     // Audio Modes
     "audio.none": "None",
     "audio.binaural": "Binaural Beats (Theta)",
@@ -167,6 +183,12 @@ export const translations: Record<Language, any> = {
     "ai.btn.notes": "Note Template",
     "ai.context.grounding": "Describing Client State...",
     "ai.cancel": "Cancel",
+    
+    // Dock & Windows
+    "dock.controls": "Controls",
+    "dock.video": "Video",
+    "dock.scripts": "Scripts",
+    "dock.ai": "AI Assist",
   },
   "zh-TW": {
     "app.title": "MindSync EMDR",
@@ -181,7 +203,8 @@ export const translations: Record<Language, any> = {
     "role.therapist.desc": "控制療程參數、使用 AI 輔助工具並監控狀態。",
     "role.client": "個案端介面",
     "role.client.desc": "進入全螢幕無干擾模式進行療程。",
-    "common.connect": "連線",
+    "common.connect": "開始療程",
+    "common.generating": "建立房間中...",
     "common.disconnect": "斷線",
     "common.connecting": "連線中...",
     "common.waiting": "等待中...",
@@ -192,6 +215,14 @@ export const translations: Record<Language, any> = {
     "common.submit": "送出評分",
     "common.cancel": "取消",
 
+    // PWA
+    "pwa.install": "安裝應用程式",
+    "pwa.ios.title": "安裝至 iOS",
+    "pwa.ios.step1": "點擊下方分享按鈕",
+    "pwa.ios.step2": "選擇「加入主畫面」",
+    "pwa.ios.step3": "點擊「加入」完成",
+    "pwa.installed": "已安裝",
+
     // Therapist Controls
     "controls.clientMonitor": "個案監控",
     "controls.sensor": "感測器",
@@ -201,6 +232,7 @@ export const translations: Record<Language, any> = {
     "controls.sensitivity": "靈敏度",
     "controls.videoSetup": "連線設定",
     "controls.serverUrl": "伺服器網址",
+    "controls.roomName": "房間名稱",
     "controls.therapistToken": "治療師金鑰 (Token)",
     "controls.clientToken": "個案金鑰 (分享此金鑰)",
     "controls.copyLink": "複製邀請連結",
@@ -229,6 +261,12 @@ export const translations: Record<Language, any> = {
     "controls.bg": "背景顏色",
     "controls.depth": "3D 深度模擬",
     "controls.depthDesc": "模擬遠近距離變化",
+    "controls.dualAttention": "工作記憶負荷 (Taxing Working Memory)",
+
+    // Dual Attention
+    "da.none": "無",
+    "da.color": "顏色命名任務",
+    "da.numbers": "隨機數字 (運算)",
 
     // Audio Modes
     "audio.none": "無",
@@ -333,5 +371,11 @@ export const translations: Record<Language, any> = {
     "ai.btn.notes": "筆記模板",
     "ai.context.grounding": "描述個案狀態中...",
     "ai.cancel": "取消",
+
+    // Dock & Windows
+    "dock.controls": "控制台",
+    "dock.video": "視訊",
+    "dock.scripts": "腳本",
+    "dock.ai": "AI 助理",
   }
 };
