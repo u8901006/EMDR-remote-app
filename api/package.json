@@ -1,0 +1,13 @@
+{
+  "name": "mindsync-emdr",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo 'No build step required'"
+  },
+  "dependencies": {
+    "livekit-server-sdk": "^2.9.3",
+    "@google/genai": "^0.1.1"
+  }
+}
