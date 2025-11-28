@@ -1,13 +1,13 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { EMDRSettings, MovementPattern, VisualTheme, MetricType, SessionMetric, EmotionType, AudioMode, DualAttentionMode } from '../types';
-import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp, Smile, Frown, Meh, AlertOctagon, Music, BrainCircuit } from 'lucide-react';
+import { EMDRSettings, MovementPattern, VisualTheme, MetricType, SessionMetric, EmotionType, AudioMode, DualAttentionMode, SessionBookmark } from '../types';
+import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp, Smile, Frown, Meh, AlertOctagon, Music, BrainCircuit, Keyboard, Bookmark, UserPlus } from 'lucide-react';
 import { PRESET_COLORS, PRESET_BG_COLORS } from '../constants';
 import { useBroadcastSession } from '../hooks/useBroadcastSession';
 import { SessionRole } from '../types';
 import { useLiveKitContext } from '../contexts/LiveKitContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
+import { useTherapistShortcuts } from '../hooks/useTherapistShortcuts';
 
 interface TherapistControlsProps {
   settings: EMDRSettings;
@@ -82,7 +82,7 @@ const EmotionIcon: React.FC<{ type: EmotionType }> = ({ type }) => {
 
 const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateSettings, onRequestSummary, latestSummary, className }) => {
   const { t, language, setLanguage } = useLanguage();
-  const { clientStatus, requestMetric, metrics } = useBroadcastSession(SessionRole.THERAPIST);
+  const { clientStatus, requestMetric, metrics, waitingClients, admitClient } = useBroadcastSession(SessionRole.THERAPIST);
   const { connect, disconnect, isConnecting, room } = useLiveKitContext();
   const { isListening, transcript, startListening, stopListening, resetTranscript, hasBrowserSupport } = useVoiceRecognition(language);
   
@@ -91,6 +91,7 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   const [showTranscription, setShowTranscription] = useState(false);
   const [showAssessment, setShowAssessment] = useState(true);
   const [localGamepadConnected, setLocalGamepadConnected] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   
   // New State for Token Generation
   const [roomName, setRoomName] = useState(`session-${Math.floor(Math.random() * 10000)}`);
@@ -105,6 +106,10 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   const sessionStartTime = useRef<number>(Date.now());
   const [freezeCount, setFreezeCount] = useState(0);
   const prevFrozenState = useRef(false);
+  
+  // Bookmarks
+  const [bookmarks, setBookmarks] = useState<SessionBookmark[]>([]);
+  const [lastBookmarkToast, setLastBookmarkToast] = useState<string | null>(null);
 
   // Termination Mode Logic
   const [terminationMode, setTerminationMode] = useState<TerminationMode>('MANUAL');
@@ -114,6 +119,25 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
 
   // Request State
   const [requestingMetric, setRequestingMetric] = useState<MetricType | null>(null);
+
+  // Keyboard Shortcuts Hook
+  const handleBookmark = () => {
+    const now = Date.now();
+    const id = now.toString();
+    const timeStr = new Date(now).toLocaleTimeString();
+    setBookmarks(prev => [...prev, { id, timestamp: now, note: "Manual Bookmark" }]);
+    
+    // Show Toast
+    setLastBookmarkToast(`${t('shortcuts.toast')} ${timeStr}`);
+    setTimeout(() => setLastBookmarkToast(null), 3000);
+  };
+
+  useTherapistShortcuts({
+      settings,
+      updateSettings,
+      onBookmark: handleBookmark,
+      isEnabled: true
+  });
 
   useEffect(() => {
       // Determine mode from initial settings or external updates
@@ -183,16 +207,16 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
         
         const data = await res.json();
         
-        if (data.token && data.url) {
+        if (res.ok && data.token && data.url) {
             updateSettings({ liveKitUrl: data.url });
             await connect(data.url, data.token);
         } else {
             console.error("Failed to get token", data);
-            alert("Could not generate session token. Check API configuration.");
+            alert(`Error: ${data.error || "Could not generate session token"}`);
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error("Error starting session", e);
-        alert("Network error starting session.");
+        alert(`Network Error: ${e.message}`);
     } finally {
         setIsGenerating(false);
     }
@@ -307,6 +331,9 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
     // Format metrics
     const sudsList = metrics.filter(m => m.type === 'SUD').map(m => `[${new Date(m.timestamp).toLocaleTimeString()}] SUD: ${m.value}/10`).join('\n');
     const vocList = metrics.filter(m => m.type === 'VOC').map(m => `[${new Date(m.timestamp).toLocaleTimeString()}] VOC: ${m.value}/7`).join('\n');
+    
+    // Format Bookmarks
+    const bookmarkList = bookmarks.map(b => `[${new Date(b.timestamp).toLocaleTimeString()}] MARKER: ${b.note}`).join('\n');
 
     const reportContent = `
 ==================================================
@@ -323,6 +350,11 @@ ${t('report.metrics')}
 ${sudsList || '(No SUDs recorded)'}
 
 ${vocList || '(No VOC recorded)'}
+
+--------------------------------------------------
+${t('report.bookmarks')}
+--------------------------------------------------
+${bookmarkList || '(No bookmarks)'}
 
 --------------------------------------------------
 ${t('report.soap')}
@@ -350,7 +382,15 @@ ${t('report.generated')}
   };
 
   return (
-    <div className={`bg-slate-900 flex flex-col text-slate-300 overflow-hidden ${className}`}>
+    <div className={`bg-slate-900 flex flex-col text-slate-300 overflow-hidden relative ${className}`}>
+      
+      {/* Toast Notification for Bookmarks */}
+      {lastBookmarkToast && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-3 py-1.5 rounded-full shadow-lg text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+              <Bookmark size={12} fill="currentColor" /> {lastBookmarkToast}
+          </div>
+      )}
+
       <div className="flex-1 overflow-y-auto p-5 space-y-8 custom-scrollbar">
         
         {/* Client Monitor */}
@@ -358,6 +398,30 @@ ${t('report.generated')}
             <div className="flex items-center gap-2 text-blue-400 font-medium text-sm uppercase tracking-wider mb-2">
                 <Eye size={14} /> {t('controls.clientMonitor')}
             </div>
+            
+            {/* Waiting Room Alert */}
+            {waitingClients.length > 0 && (
+                <div className="bg-yellow-900/30 border border-yellow-600/50 rounded-lg p-3 mb-3 animate-pulse">
+                    <div className="flex items-center gap-2 text-yellow-400 text-sm font-bold mb-2">
+                        <UserPlus size={16} />
+                        {t('controls.waitingRoom')} ({waitingClients.length} {t('controls.waiting')})
+                    </div>
+                    <div className="space-y-2">
+                        {waitingClients.map(client => (
+                            <div key={client.sid} className="flex items-center justify-between bg-yellow-950/50 p-2 rounded">
+                                <span className="text-xs text-yellow-200">{client.identity}</span>
+                                <button 
+                                    onClick={() => admitClient(client.sid)}
+                                    className="px-3 py-1 bg-yellow-600 hover:bg-yellow-500 text-white text-xs rounded font-bold transition-colors"
+                                >
+                                    {t('controls.admit')}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {clientStatus ? (
                 <div className="space-y-3">
                     <div className="flex justify-between items-center text-sm">
@@ -1011,8 +1075,29 @@ ${t('report.generated')}
             </div>
         </section>
 
-        {/* Bottom Language Switcher */}
+        {/* Shortcuts Info Toggle */}
         <div className="mt-4 pt-4 border-t border-slate-800">
+             <button 
+                onClick={() => setShowShortcuts(!showShortcuts)}
+                className="w-full flex items-center justify-between text-xs text-slate-500 hover:text-blue-400 transition-colors"
+             >
+                <div className="flex items-center gap-2">
+                    <Keyboard size={14} /> {t('shortcuts.title')}
+                </div>
+                {showShortcuts ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+             </button>
+             
+             {showShortcuts && (
+                 <div className="mt-2 text-[10px] text-slate-400 space-y-1 p-2 bg-slate-800/50 rounded">
+                     <p>{t('shortcuts.space')}</p>
+                     <p>{t('shortcuts.arrows')}</p>
+                     <p>{t('shortcuts.mark')}</p>
+                 </div>
+             )}
+        </div>
+
+        {/* Bottom Language Switcher */}
+        <div className="mt-2 pt-2">
             <button 
                 onClick={() => setLanguage(language === 'en' ? 'zh-TW' : 'en')}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors text-xs font-medium"

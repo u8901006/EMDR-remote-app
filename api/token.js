@@ -16,7 +16,12 @@ export default async function handler(req, res) {
   const wsUrl = process.env.LIVEKIT_URL;
 
   if (!apiKey || !apiSecret || !wsUrl) {
-    return res.status(500).json({ error: 'Server misconfigured' });
+    console.error("Server Misconfigured. Missing Environment Variables:");
+    if (!apiKey) console.error("- LIVEKIT_API_KEY is missing");
+    if (!apiSecret) console.error("- LIVEKIT_API_SECRET is missing");
+    if (!wsUrl) console.error("- LIVEKIT_URL is missing");
+    
+    return res.status(500).json({ error: 'Server misconfigured: Missing LiveKit Environment Variables on Vercel.' });
   }
 
   try {
@@ -24,11 +29,10 @@ export default async function handler(req, res) {
       identity: participantName,
     });
 
-    // Grant permissions based on role
     at.addGrant({
       roomJoin: true,
       room: roomName,
-      canPublish: true, // Both need to publish (Client sends EyeTracker data/Video)
+      canPublish: true,
       canSubscribe: true,
       canPublishData: true,
     });
@@ -38,6 +42,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ token, url: wsUrl });
   } catch (error) {
     console.error('Token generation error:', error);
-    return res.status(500).json({ error: 'Failed to generate token' });
+    return res.status(500).json({ error: 'Failed to generate token: ' + error.message });
   }
 }

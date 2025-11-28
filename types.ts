@@ -1,4 +1,5 @@
 
+
 export enum SessionRole {
   THERAPIST = 'THERAPIST',
   CLIENT = 'CLIENT',
@@ -97,8 +98,20 @@ export interface SessionMetric {
   timestamp: number;
 }
 
+export interface SessionBookmark {
+  id: string;
+  timestamp: number;
+  note: string;
+}
+
+export interface WaitingClient {
+  sid: string;
+  identity: string;
+  joinedAt: number;
+}
+
 export interface SessionMessage {
-  type: 'SYNC_SETTINGS' | 'REQUEST_SYNC' | 'SESSION_END' | 'CLIENT_STATUS' | 'REQUEST_METRIC' | 'SUBMIT_METRIC';
+  type: 'SYNC_SETTINGS' | 'REQUEST_SYNC' | 'SESSION_END' | 'CLIENT_STATUS' | 'REQUEST_METRIC' | 'SUBMIT_METRIC' | 'JOIN_REQUEST' | 'ADMIT_CLIENT';
   payload?: Partial<EMDRSettings>;
   clientStatus?: ClientStatus;
   metricType?: MetricType; // For REQUEST_METRIC

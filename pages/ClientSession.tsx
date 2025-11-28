@@ -1,7 +1,8 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Maximize, Minimize, ArrowLeft, Loader2, Settings2, X, Clock, Sliders, Volume2, VolumeX, Gamepad2, Palette, Link as LinkIcon, AlertCircle, Globe, Video, Activity, ChevronDown, ChevronRight, CheckCircle2, Music, Upload } from 'lucide-react';
+import { Maximize, Minimize, ArrowLeft, Loader2, Settings2, X, Clock, Sliders, Volume2, VolumeX, Gamepad2, Palette, Link as LinkIcon, AlertCircle, Globe, Video, Activity, ChevronDown, ChevronRight, CheckCircle2, Music, Upload, Lock, Bell } from 'lucide-react';
 import EMDRCanvas from '../components/EMDRCanvas';
 import EyeTracker from '../components/EyeTracker';
 import LiveVideo from '../components/LiveVideo';
@@ -12,7 +13,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 const ClientSession: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
-  const { settings, updateSettings, sendClientStatus, pendingMetricRequest, submitMetric, setPendingMetricRequest } = useBroadcastSession(SessionRole.CLIENT);
+  const { settings, updateSettings, sendClientStatus, pendingMetricRequest, submitMetric, setPendingMetricRequest, isAdmitted } = useBroadcastSession(SessionRole.CLIENT);
   const { room, connect, isConnecting, error } = useLiveKitContext();
   const [searchParams, setSearchParams] = useSearchParams();
   
@@ -278,6 +279,35 @@ const ClientSession: React.FC = () => {
                         <Globe size={12} className="group-hover:rotate-12 transition-transform" />
                         {language === 'en' ? 'Switch to 繁體中文' : 'Switch to English'}
                     </button>
+                 </div>
+             </div>
+        </div>
+      );
+  }
+
+  // WAITING ROOM SCREEN
+  if (!isAdmitted) {
+      return (
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden">
+             {/* Background Pulse */}
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-900/10 rounded-full blur-3xl animate-pulse-slow"></div>
+
+             <div className="z-10 bg-slate-900/80 backdrop-blur-md border border-slate-700 p-10 rounded-3xl text-center max-w-lg w-full shadow-2xl space-y-8 animate-in fade-in zoom-in duration-500">
+                 <div className="relative inline-block">
+                     <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl animate-pulse"></div>
+                     <div className="relative w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center border border-slate-600">
+                         <Lock size={48} className="text-slate-300" />
+                     </div>
+                 </div>
+
+                 <div className="space-y-3">
+                     <h2 className="text-3xl font-bold text-white tracking-tight">{t('client.waitingTitle')}</h2>
+                     <p className="text-slate-400 text-lg leading-relaxed">{t('client.waitingDesc')}</p>
+                 </div>
+
+                 <div className="flex items-center justify-center gap-3 text-blue-400 bg-blue-900/20 py-2 px-4 rounded-full w-fit mx-auto border border-blue-500/20">
+                     <Bell size={18} className="animate-bounce" />
+                     <span className="font-medium tracking-wide animate-pulse">{t('client.knocking')}</span>
                  </div>
              </div>
         </div>
