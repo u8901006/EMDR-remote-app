@@ -75,9 +75,6 @@ export const translations: Record<Language, any> = {
     "controls.depth": "3D Depth",
     "controls.depthDesc": "Simulate distance change",
     "controls.dualAttention": "Taxing Working Memory",
-    "controls.waitingRoom": "Waiting Room",
-    "controls.admit": "Admit",
-    "controls.waiting": "client(s) waiting",
     
     // Dual Attention
     "da.none": "None",
@@ -185,9 +182,6 @@ export const translations: Record<Language, any> = {
     "client.metric.sudsDesc": "0 is neutral/no disturbance, 10 is the worst disturbance imaginable.",
     "client.metric.vocTitle": "Validity of Cognition",
     "client.metric.vocDesc": "1 is completely false, 7 is completely true.",
-    "client.waitingTitle": "Waiting for Therapist",
-    "client.waitingDesc": "Please wait in the waiting room. The therapist will admit you shortly.",
-    "client.knocking": "Notifying therapist...",
     
     // AI
     "ai.title": "AI Clinical Assistant",
@@ -277,9 +271,6 @@ export const translations: Record<Language, any> = {
     "controls.depth": "3D 深度模擬",
     "controls.depthDesc": "模擬遠近距離變化",
     "controls.dualAttention": "工作記憶負荷 (Taxing Working Memory)",
-    "controls.waitingRoom": "候診室",
-    "controls.admit": "允許進入",
-    "controls.waiting": "人等待中",
 
     // Dual Attention
     "da.none": "無",
@@ -387,9 +378,6 @@ export const translations: Record<Language, any> = {
     "client.metric.sudsDesc": "0 為平靜無困擾，10 為所能想像最嚴重的困擾。",
     "client.metric.vocTitle": "VOC 認知真實度",
     "client.metric.vocDesc": "1 為完全感覺不到真實，7 為感覺完全真實。",
-    "client.waitingTitle": "等待治療師",
-    "client.waitingDesc": "請在候診室稍後，治療師將很快允許您進入。",
-    "client.knocking": "通知治療師中...",
 
     // AI
     "ai.title": "AI 臨床助理",

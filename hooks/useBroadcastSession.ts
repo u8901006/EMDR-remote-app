@@ -1,7 +1,7 @@
 
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { EMDRSettings, SessionMessage, ClientStatus, SessionMetric, MetricType, WaitingClient } from '../types';
+import { EMDRSettings, SessionMessage, ClientStatus, SessionMetric, MetricType } from '../types';
 import { DEFAULT_SETTINGS } from '../constants';
 import { useLiveKitContext } from '../contexts/LiveKitContext';
 import { RoomEvent, DataPacket_Kind, Participant } from 'livekit-client';
@@ -14,10 +14,6 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
   // Clinical Metrics State
   const [metrics, setMetrics] = useState<SessionMetric[]>([]);
   const [pendingMetricRequest, setPendingMetricRequest] = useState<MetricType | null>(null);
-
-  // Waiting Room State
-  const [waitingClients, setWaitingClients] = useState<WaitingClient[]>([]);
-  const [isAdmitted, setIsAdmitted] = useState(false);
 
   // Refs to handle stale closures in event listeners
   const settingsRef = useRef<EMDRSettings>(settings);
@@ -36,12 +32,10 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
         const message = JSON.parse(str) as SessionMessage;
 
         if (message.type === 'SYNC_SETTINGS' && message.payload) {
-          if (role === 'CLIENT' && isAdmitted) {
+          if (role === 'CLIENT') {
              setSettings(prev => ({ ...prev, ...message.payload }));
           }
         } else if (message.type === 'REQUEST_SYNC' && role === 'THERAPIST') {
-          // Only sync if client is admitted? For simplicity, we just sync settings.
-          // In strict mode, we might check if participant.sid is in an 'admitted' list.
           sendData({
             type: 'SYNC_SETTINGS',
             payload: settingsRef.current,
@@ -49,65 +43,30 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
           });
         } else if (message.type === 'CLIENT_STATUS' && role === 'THERAPIST' && message.clientStatus) {
           setClientStatus(message.clientStatus);
-        } else if (message.type === 'REQUEST_METRIC' && role === 'CLIENT' && message.metricType && isAdmitted) {
+        } else if (message.type === 'REQUEST_METRIC' && role === 'CLIENT' && message.metricType) {
             setPendingMetricRequest(message.metricType);
         } else if (message.type === 'SUBMIT_METRIC' && role === 'THERAPIST' && message.metric) {
             setMetrics(prev => [...prev, message.metric!]);
-        } else if (message.type === 'JOIN_REQUEST' && role === 'THERAPIST' && participant) {
-            setWaitingClients(prev => {
-                if (prev.find(c => c.sid === participant.sid)) return prev;
-                return [...prev, {
-                    sid: participant.sid,
-                    identity: participant.identity || 'Unknown',
-                    joinedAt: Date.now()
-                }];
-            });
-        } else if (message.type === 'ADMIT_CLIENT' && role === 'CLIENT') {
-             setIsAdmitted(true);
-             // Request immediate sync upon admission
-             setTimeout(() => {
-                sendData({ type: 'REQUEST_SYNC', timestamp: Date.now() });
-             }, 100);
         }
       } catch (e) {
         console.error("Failed to parse data packet:", e);
       }
     };
 
-    const handleParticipantDisconnected = (p: Participant) => {
-        if (role === 'THERAPIST') {
-            setWaitingClients(prev => prev.filter(c => c.sid !== p.sid));
-        }
-    };
-
     room.on(RoomEvent.DataReceived, handleData);
-    room.on(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
 
-    // If Client, send Join Request immediately
-    let joinInterval: any;
-    if (role === 'CLIENT') {
-       // Reset admission state on new room connection
-       setIsAdmitted(false);
-       
-       // Send join request periodically until admitted
-       const sendJoin = () => {
-           if (!isAdmitted && room.state === 'connected') {
-               sendData({ type: 'JOIN_REQUEST', timestamp: Date.now() });
-           }
-       };
-       
-       // Initial attempt
-       setTimeout(sendJoin, 500);
-       joinInterval = setInterval(sendJoin, 3000);
+    // Request sync immediately upon connection for Client
+    if (role === 'CLIENT' && room.state === 'connected') {
+        setTimeout(() => {
+            sendData({ type: 'REQUEST_SYNC', timestamp: Date.now() });
+        }, 500);
     }
 
     return () => {
       room.off(RoomEvent.DataReceived, handleData);
-      room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
-      if (joinInterval) clearInterval(joinInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room, role, isAdmitted]);
+  }, [room, role]);
 
   // Helper to send data via LiveKit
   const sendData = (message: SessionMessage, reliable: boolean = true, destinationSids?: string[]) => {
@@ -149,14 +108,14 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
 
   // Function for Client to broadcast status
   const sendClientStatus = useCallback((status: ClientStatus) => {
-    if (role === 'CLIENT' && room && isAdmitted) {
+    if (role === 'CLIENT' && room) {
         sendData({
             type: 'CLIENT_STATUS',
             clientStatus: status,
             timestamp: Date.now()
         }, false);
     }
-  }, [role, room, isAdmitted]);
+  }, [role, room]);
 
   // --- Metric Logic ---
   const requestMetric = useCallback((type: MetricType) => {
@@ -186,18 +145,6 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
       }
   }, [role, room, pendingMetricRequest]);
 
-  // --- Waiting Room Logic (Therapist) ---
-  const admitClient = useCallback((sid: string) => {
-      if (role === 'THERAPIST' && room) {
-          sendData({
-              type: 'ADMIT_CLIENT',
-              timestamp: Date.now()
-          }, true, [sid]); // Direct message to specific client
-          
-          setWaitingClients(prev => prev.filter(c => c.sid !== sid));
-      }
-  }, [role, room]);
-
   return { 
       settings, 
       updateSettings, 
@@ -207,9 +154,6 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
       pendingMetricRequest,
       setPendingMetricRequest,
       requestMetric,
-      submitMetric,
-      waitingClients,
-      admitClient,
-      isAdmitted
+      submitMetric
   };
 };

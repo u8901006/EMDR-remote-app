@@ -104,14 +104,8 @@ export interface SessionBookmark {
   note: string;
 }
 
-export interface WaitingClient {
-  sid: string;
-  identity: string;
-  joinedAt: number;
-}
-
 export interface SessionMessage {
-  type: 'SYNC_SETTINGS' | 'REQUEST_SYNC' | 'SESSION_END' | 'CLIENT_STATUS' | 'REQUEST_METRIC' | 'SUBMIT_METRIC' | 'JOIN_REQUEST' | 'ADMIT_CLIENT';
+  type: 'SYNC_SETTINGS' | 'REQUEST_SYNC' | 'SESSION_END' | 'CLIENT_STATUS' | 'REQUEST_METRIC' | 'SUBMIT_METRIC';
   payload?: Partial<EMDRSettings>;
   clientStatus?: ClientStatus;
   metricType?: MetricType; // For REQUEST_METRIC

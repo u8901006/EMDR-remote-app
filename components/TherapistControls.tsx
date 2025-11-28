@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { EMDRSettings, MovementPattern, VisualTheme, MetricType, SessionMetric, EmotionType, AudioMode, DualAttentionMode, SessionBookmark } from '../types';
 import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp, Smile, Frown, Meh, AlertOctagon, Music, BrainCircuit, Keyboard, Bookmark, UserPlus } from 'lucide-react';
@@ -82,7 +84,7 @@ const EmotionIcon: React.FC<{ type: EmotionType }> = ({ type }) => {
 
 const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateSettings, onRequestSummary, latestSummary, className }) => {
   const { t, language, setLanguage } = useLanguage();
-  const { clientStatus, requestMetric, metrics, waitingClients, admitClient } = useBroadcastSession(SessionRole.THERAPIST);
+  const { clientStatus, requestMetric, metrics } = useBroadcastSession(SessionRole.THERAPIST);
   const { connect, disconnect, isConnecting, room } = useLiveKitContext();
   const { isListening, transcript, startListening, stopListening, resetTranscript, hasBrowserSupport } = useVoiceRecognition(language);
   
@@ -212,7 +214,7 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
             await connect(data.url, data.token);
         } else {
             console.error("Failed to get token", data);
-            alert(`Error: ${data.error || "Could not generate session token"}`);
+            alert(data.error || "Could not generate session token. Check API configuration.");
         }
     } catch (e: any) {
         console.error("Error starting session", e);
@@ -399,29 +401,6 @@ ${t('report.generated')}
                 <Eye size={14} /> {t('controls.clientMonitor')}
             </div>
             
-            {/* Waiting Room Alert */}
-            {waitingClients.length > 0 && (
-                <div className="bg-yellow-900/30 border border-yellow-600/50 rounded-lg p-3 mb-3 animate-pulse">
-                    <div className="flex items-center gap-2 text-yellow-400 text-sm font-bold mb-2">
-                        <UserPlus size={16} />
-                        {t('controls.waitingRoom')} ({waitingClients.length} {t('controls.waiting')})
-                    </div>
-                    <div className="space-y-2">
-                        {waitingClients.map(client => (
-                            <div key={client.sid} className="flex items-center justify-between bg-yellow-950/50 p-2 rounded">
-                                <span className="text-xs text-yellow-200">{client.identity}</span>
-                                <button 
-                                    onClick={() => admitClient(client.sid)}
-                                    className="px-3 py-1 bg-yellow-600 hover:bg-yellow-500 text-white text-xs rounded font-bold transition-colors"
-                                >
-                                    {t('controls.admit')}
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
             {clientStatus ? (
                 <div className="space-y-3">
                     <div className="flex justify-between items-center text-sm">
