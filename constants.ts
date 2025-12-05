@@ -1,5 +1,5 @@
 
-import { EMDRSettings, MovementPattern, VisualTheme, AudioMode, DualAttentionMode } from './types';
+import { EMDRSettings, MovementPattern, VisualTheme, AudioMode, DualAttentionMode, AIProvider } from './types';
 
 export const DEFAULT_SETTINGS: EMDRSettings = {
   isPlaying: false,
@@ -25,6 +25,13 @@ export const DEFAULT_SETTINGS: EMDRSettings = {
   durationSeconds: 0,
   targetPasses: 0,
   freezeSensitivity: 50,
+  
+  // AI Defaults
+  aiProvider: AIProvider.CLOUD,
+  ollamaUrl: 'http://localhost:11434',
+  ollamaModel: 'llama3',
+  whisperUrl: 'http://localhost:8000/v1/audio/transcriptions',
+
   liveKitUrl: '',
   liveKitTherapistToken: '',
   liveKitClientToken: '',

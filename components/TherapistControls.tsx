@@ -1,8 +1,7 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
-import { EMDRSettings, MovementPattern, VisualTheme, MetricType, SessionMetric, EmotionType, AudioMode, DualAttentionMode, SessionBookmark } from '../types';
-import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp, Smile, Frown, Meh, AlertOctagon, Music, BrainCircuit, Keyboard, Bookmark, UserPlus } from 'lucide-react';
+import { EMDRSettings, MovementPattern, VisualTheme, MetricType, SessionMetric, EmotionType, AudioMode, DualAttentionMode, SessionBookmark, AIProvider } from '../types';
+import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp, Smile, Frown, Meh, AlertOctagon, Music, BrainCircuit, Keyboard, Bookmark, UserPlus, Cpu } from 'lucide-react';
 import { PRESET_COLORS, PRESET_BG_COLORS } from '../constants';
 import { useBroadcastSession } from '../hooks/useBroadcastSession';
 import { SessionRole } from '../types';
@@ -15,7 +14,7 @@ interface TherapistControlsProps {
   settings: EMDRSettings;
   updateSettings: (settings: Partial<EMDRSettings>) => void;
   onRequestSummary: (text: string) => void;
-  latestSummary?: string; // Generated AI summary passed down from parent
+  latestSummary?: string; 
   className?: string;
 }
 
@@ -53,13 +52,8 @@ const Sparkline: React.FC<{ data: SessionMetric[], type: MetricType, color: stri
     return (
         <div className="relative h-10 w-full">
             <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
-                {/* Reference Line (Midpoint) */}
                 <line x1="0" y1={height/2} x2={width} y2={height/2} stroke="#334155" strokeDasharray="2,2" strokeWidth="1" />
-                
-                {/* The Line */}
                 <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                
-                {/* Dots */}
                 {filtered.map((d, i) => (
                     <circle key={d.id} cx={getX(i)} cy={getY(d.value)} r="3" fill="#0f172a" stroke={color} strokeWidth="1.5" />
                 ))}
@@ -71,7 +65,6 @@ const Sparkline: React.FC<{ data: SessionMetric[], type: MetricType, color: stri
     );
 };
 
-// Emotion Icon Helper
 const EmotionIcon: React.FC<{ type: EmotionType }> = ({ type }) => {
     switch (type) {
         case 'JOY': return <Smile size={18} className="text-yellow-400" />;
@@ -86,50 +79,41 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   const { t, language, setLanguage } = useLanguage();
   const { clientStatus, requestMetric, metrics } = useBroadcastSession(SessionRole.THERAPIST);
   const { connect, disconnect, isConnecting, room } = useLiveKitContext();
-  const { isListening, transcript, startListening, stopListening, resetTranscript, hasBrowserSupport } = useVoiceRecognition(language);
+  
+  // Voice Recognition with Settings support for Local AI
+  const { isListening, transcript, startListening, stopListening, resetTranscript, hasBrowserSupport } = useVoiceRecognition(language, settings);
   
   const [showVideoConfig, setShowVideoConfig] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [showTranscription, setShowTranscription] = useState(false);
   const [showAssessment, setShowAssessment] = useState(true);
+  const [showAIConfig, setShowAIConfig] = useState(false);
   const [localGamepadConnected, setLocalGamepadConnected] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   
-  // New State for Token Generation
   const [roomName, setRoomName] = useState(`session-${Math.floor(Math.random() * 10000)}`);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
-  // Preset State
   const [presets, setPresets] = useState<SavedPreset[]>([]);
   const [newPresetName, setNewPresetName] = useState('');
 
-  // Stats for Report
   const sessionStartTime = useRef<number>(Date.now());
   const [freezeCount, setFreezeCount] = useState(0);
   const prevFrozenState = useRef(false);
   
-  // Bookmarks
   const [bookmarks, setBookmarks] = useState<SessionBookmark[]>([]);
   const [lastBookmarkToast, setLastBookmarkToast] = useState<string | null>(null);
 
-  // Termination Mode Logic
   const [terminationMode, setTerminationMode] = useState<TerminationMode>('MANUAL');
-  
-  // Image Upload Ref
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Request State
   const [requestingMetric, setRequestingMetric] = useState<MetricType | null>(null);
 
-  // Keyboard Shortcuts Hook
   const handleBookmark = () => {
     const now = Date.now();
     const id = now.toString();
     const timeStr = new Date(now).toLocaleTimeString();
     setBookmarks(prev => [...prev, { id, timestamp: now, note: "Manual Bookmark" }]);
-    
-    // Show Toast
     setLastBookmarkToast(`${t('shortcuts.toast')} ${timeStr}`);
     setTimeout(() => setLastBookmarkToast(null), 3000);
   };
@@ -142,7 +126,6 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   });
 
   useEffect(() => {
-      // Determine mode from initial settings or external updates
       if (settings.targetPasses > 0) {
           setTerminationMode('PASSES');
       } else if (settings.durationSeconds > 0) {
@@ -157,13 +140,12 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
       if (mode === 'MANUAL') {
           updateSettings({ durationSeconds: 0, targetPasses: 0 });
       } else if (mode === 'TIMER') {
-          updateSettings({ durationSeconds: 60, targetPasses: 0 }); // Default 1 min
+          updateSettings({ durationSeconds: 60, targetPasses: 0 }); 
       } else if (mode === 'PASSES') {
-          updateSettings({ durationSeconds: 0, targetPasses: 24 }); // Default 24 passes
+          updateSettings({ durationSeconds: 0, targetPasses: 24 });
       }
   };
 
-  // Track freeze events
   useEffect(() => {
       if (clientStatus?.isFrozen && !prevFrozenState.current) {
           setFreezeCount(c => c + 1);
@@ -171,10 +153,8 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
       prevFrozenState.current = !!clientStatus?.isFrozen;
   }, [clientStatus?.isFrozen]);
 
-  // Reset requesting state when a new metric arrives
   useEffect(() => {
       if (requestingMetric) {
-          // Check if we got a new metric of that type that is recent
           const recent = metrics.filter(m => m.type === requestingMetric && m.timestamp > Date.now() - 2000);
           if (recent.length > 0) {
               setRequestingMetric(null);
@@ -182,7 +162,6 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
       }
   }, [metrics, requestingMetric]);
 
-  // Load presets on mount
   useEffect(() => {
     const saved = localStorage.getItem('emdr-presets');
     if (saved) {
@@ -208,16 +187,13 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
         });
         
         const data = await res.json();
-        
         if (res.ok && data.token && data.url) {
             updateSettings({ liveKitUrl: data.url });
             await connect(data.url, data.token);
         } else {
-            console.error("Failed to get token", data);
-            alert(data.error || "Could not generate session token. Check API configuration.");
+            alert(data.error || "Could not generate session token.");
         }
     } catch (e: any) {
-        console.error("Error starting session", e);
         alert(`Network Error: ${e.message}`);
     } finally {
         setIsGenerating(false);
@@ -226,28 +202,21 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
 
   const handleCopyInviteLink = () => {
     const baseUrl = window.location.href.split('#')[0].replace(/\/$/, '');
-    // Only append Room Name, not token
     const inviteLink = `${baseUrl}/#/client?room=${encodeURIComponent(roomName)}`;
-    
     navigator.clipboard.writeText(inviteLink).then(() => {
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
     });
   };
 
-  // Preset Logic
   const handleSavePreset = () => {
       if (!newPresetName.trim()) return;
-
-      // Filter out connection details and temporary state
       const { liveKitUrl, liveKitTherapistToken, liveKitClientToken, isPlaying, ...safeSettings } = settings;
-
       const newPreset: SavedPreset = {
           id: Date.now().toString(),
           name: newPresetName.trim(),
           settings: safeSettings
       };
-
       const updated = [...presets, newPreset];
       setPresets(updated);
       localStorage.setItem('emdr-presets', JSON.stringify(updated));
@@ -255,7 +224,6 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   };
 
   const handleLoadPreset = (preset: SavedPreset) => {
-      // Don't overwrite connection details
       updateSettings({ ...preset.settings, isPlaying: false });
   };
 
@@ -290,6 +258,10 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   const handleDualAttentionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       updateSettings({ dualAttentionMode: e.target.value as DualAttentionMode });
   };
+  
+  const handleAIProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      updateSettings({ aiProvider: e.target.value as AIProvider });
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -306,7 +278,6 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
   const handleRequestMetric = (type: MetricType) => {
       requestMetric(type);
       setRequestingMetric(type);
-      // Timeout reset in case client doesn't respond
       setTimeout(() => setRequestingMetric(null), 15000);
   };
 
@@ -330,11 +301,8 @@ const TherapistControls: React.FC<TherapistControlsProps> = ({ settings, updateS
     const durationSec = Math.floor((durationMs % 60000) / 1000);
     const dateStr = new Date().toLocaleString(language === 'zh-TW' ? 'zh-TW' : 'en-US');
 
-    // Format metrics
     const sudsList = metrics.filter(m => m.type === 'SUD').map(m => `[${new Date(m.timestamp).toLocaleTimeString()}] SUD: ${m.value}/10`).join('\n');
     const vocList = metrics.filter(m => m.type === 'VOC').map(m => `[${new Date(m.timestamp).toLocaleTimeString()}] VOC: ${m.value}/7`).join('\n');
-    
-    // Format Bookmarks
     const bookmarkList = bookmarks.map(b => `[${new Date(b.timestamp).toLocaleTimeString()}] MARKER: ${b.note}`).join('\n');
 
     const reportContent = `
@@ -345,6 +313,7 @@ ${t('report.title')}
 ${t('report.date')}: ${dateStr}
 ${t('report.duration')}: ${durationMin}m ${durationSec}s
 ${t('report.freezeCount')}: ${freezeCount}
+${t('ai.config.provider')}: ${settings.aiProvider}
 
 --------------------------------------------------
 ${t('report.metrics')}
@@ -386,7 +355,6 @@ ${t('report.generated')}
   return (
     <div className={`bg-slate-900 flex flex-col text-slate-300 overflow-hidden relative ${className}`}>
       
-      {/* Toast Notification for Bookmarks */}
       {lastBookmarkToast && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-3 py-1.5 rounded-full shadow-lg text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
               <Bookmark size={12} fill="currentColor" /> {lastBookmarkToast}
@@ -400,7 +368,6 @@ ${t('report.generated')}
             <div className="flex items-center gap-2 text-blue-400 font-medium text-sm uppercase tracking-wider mb-2">
                 <Eye size={14} /> {t('controls.clientMonitor')}
             </div>
-            
             {clientStatus ? (
                 <div className="space-y-3">
                     <div className="flex justify-between items-center text-sm">
@@ -410,7 +377,6 @@ ${t('report.generated')}
                         </span>
                     </div>
                     
-                    {/* Emotion Detection Display */}
                     <div className="bg-slate-900/50 p-2 rounded border border-slate-800 flex items-center gap-3">
                          <div className="bg-slate-800 p-1.5 rounded-full">
                             {clientStatus.emotion ? (
@@ -454,6 +420,65 @@ ${t('report.generated')}
             )}
         </section>
 
+        {/* AI Configuration */}
+        <section className="bg-slate-800/30 p-3 rounded-lg border border-slate-700/30">
+            <button 
+                onClick={() => setShowAIConfig(!showAIConfig)}
+                className="w-full flex items-center justify-between text-blue-400 font-medium text-sm uppercase tracking-wider"
+            >
+                <div className="flex items-center gap-2"><Cpu size={14} /> {t('ai.config.title')}</div>
+                {showAIConfig ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+
+            {showAIConfig && (
+                <div className="space-y-3 mt-3 animate-in fade-in slide-in-from-top-2">
+                    <div className="space-y-1">
+                        <label className="text-xs text-slate-400">{t('ai.config.provider')}</label>
+                        <select 
+                            value={settings.aiProvider} 
+                            onChange={handleAIProviderChange} 
+                            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white outline-none"
+                        >
+                            <option value={AIProvider.CLOUD}>{t('ai.config.cloud')}</option>
+                            <option value={AIProvider.LOCAL}>{t('ai.config.local')}</option>
+                        </select>
+                    </div>
+
+                    {settings.aiProvider === AIProvider.LOCAL && (
+                        <>
+                            <div className="space-y-1">
+                                <label className="text-xs text-slate-400">{t('ai.config.ollamaUrl')}</label>
+                                <input 
+                                    type="text" 
+                                    value={settings.ollamaUrl}
+                                    onChange={(e) => updateSettings({ ollamaUrl: e.target.value })}
+                                    className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white outline-none"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs text-slate-400">{t('ai.config.ollamaModel')}</label>
+                                <input 
+                                    type="text" 
+                                    value={settings.ollamaModel}
+                                    onChange={(e) => updateSettings({ ollamaModel: e.target.value })}
+                                    className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white outline-none"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs text-slate-400">{t('ai.config.whisperUrl')}</label>
+                                <input 
+                                    type="text" 
+                                    value={settings.whisperUrl}
+                                    onChange={(e) => updateSettings({ whisperUrl: e.target.value })}
+                                    className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white outline-none"
+                                />
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
+        </section>
+
         {/* Clinical Assessment */}
         <section className="bg-slate-800/30 p-3 rounded-lg border border-slate-700/30">
             <button 
@@ -466,7 +491,6 @@ ${t('report.generated')}
             
             {showAssessment && (
                 <div className="space-y-4 mt-3 animate-in fade-in slide-in-from-top-2">
-                    {/* SUDs */}
                     <div className="space-y-1">
                         <div className="flex justify-between items-center text-xs">
                             <span className="text-slate-400 font-bold">{t('metrics.suds')}</span>
@@ -481,7 +505,6 @@ ${t('report.generated')}
                         <Sparkline data={metrics} type="SUD" color="#ef4444" max={10} />
                     </div>
 
-                    {/* VOC */}
                     <div className="space-y-1">
                         <div className="flex justify-between items-center text-xs">
                             <span className="text-slate-400 font-bold">{t('metrics.voc')}</span>
@@ -514,7 +537,7 @@ ${t('report.generated')}
             
             {showTranscription && (
                 <div className="space-y-3 mt-3 animate-in fade-in slide-in-from-top-2">
-                     {!hasBrowserSupport ? (
+                     {!hasBrowserSupport && settings.aiProvider === AIProvider.CLOUD ? (
                         <div className="text-xs text-red-400 text-center border border-red-500/30 p-2 rounded bg-red-900/10">
                             {t('transcription.unsupported')}
                         </div>
@@ -575,6 +598,7 @@ ${t('report.generated')}
             )}
         </section>
         
+        {/* Presets, Video Config, Playback Controls... (Keeping existing UI for these sections but just wrapping up the file) */}
         {/* Session Presets */}
         <section className="bg-slate-800/30 p-3 rounded-lg border border-slate-700/30">
             <button 
@@ -701,6 +725,8 @@ ${t('report.generated')}
             )}
         </section>
 
+        {/* Playback Controls & Motion Settings & Visuals... */}
+        {/* (Assuming remaining sections are unchanged except for adding ID props if needed, but they are generic) */}
         {/* Playback Controls */}
         <section className="space-y-3">
              <div className="flex items-center justify-between mb-2">
@@ -709,7 +735,6 @@ ${t('report.generated')}
                  </div>
              </div>
              
-             {/* Termination Mode Switcher */}
              <div className="flex p-1 bg-slate-800 rounded-lg">
                  {(['MANUAL', 'TIMER', 'PASSES'] as TerminationMode[]).map(mode => (
                      <button
@@ -728,7 +753,6 @@ ${t('report.generated')}
                  ))}
              </div>
 
-             {/* Dynamic Input based on Mode */}
              {terminationMode === 'TIMER' && (
                  <div className="animate-in fade-in slide-in-from-top-1 bg-slate-800/30 p-2 rounded border border-slate-700/30">
                      <div className="flex justify-between items-center text-xs text-slate-300 mb-1">
@@ -935,7 +959,6 @@ ${t('report.generated')}
                 </div>
             )}
 
-            {/* Background Color (Only for Standard) */}
             {settings.theme === VisualTheme.STANDARD && (
                 <div className="space-y-2">
                     <label className="text-sm">{t('controls.bg')}</label>
@@ -988,7 +1011,6 @@ ${t('report.generated')}
                         className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
                     />
 
-                    {/* Background Audio Selector */}
                     <div className="pt-2">
                         <label className="text-sm flex items-center gap-2 mb-1">
                             <Music size={14} className="text-slate-400" />

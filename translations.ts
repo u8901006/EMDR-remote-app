@@ -1,5 +1,4 @@
 
-
 import { Language } from "./types";
 
 export const translations: Record<Language, any> = {
@@ -76,6 +75,15 @@ export const translations: Record<Language, any> = {
     "controls.depthDesc": "Simulate distance change",
     "controls.dualAttention": "Taxing Working Memory",
     
+    // AI Settings
+    "ai.config.title": "AI Configuration",
+    "ai.config.provider": "AI Provider",
+    "ai.config.cloud": "Cloud (Google Gemini)",
+    "ai.config.local": "Local (Ollama + Whisper)",
+    "ai.config.ollamaUrl": "Ollama URL",
+    "ai.config.ollamaModel": "Ollama Model",
+    "ai.config.whisperUrl": "Whisper Server URL",
+
     // Dual Attention
     "da.none": "None",
     "da.color": "Color Naming Task",
@@ -271,6 +279,15 @@ export const translations: Record<Language, any> = {
     "controls.depth": "3D 深度模擬",
     "controls.depthDesc": "模擬遠近距離變化",
     "controls.dualAttention": "工作記憶負荷 (Taxing Working Memory)",
+
+    // AI Settings
+    "ai.config.title": "AI 模組設定",
+    "ai.config.provider": "AI 提供者",
+    "ai.config.cloud": "雲端 (Google Gemini)",
+    "ai.config.local": "本地 (Ollama + Whisper)",
+    "ai.config.ollamaUrl": "Ollama 網址",
+    "ai.config.ollamaModel": "Ollama 模型名稱",
+    "ai.config.whisperUrl": "Whisper 伺服器網址",
 
     // Dual Attention
     "da.none": "無",

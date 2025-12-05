@@ -1,5 +1,4 @@
 
-
 export enum SessionRole {
   THERAPIST = 'THERAPIST',
   CLIENT = 'CLIENT',
@@ -38,6 +37,11 @@ export enum DualAttentionMode {
   NUMBERS = 'NUMBERS' // Random numbers 1-9 appear inside ball
 }
 
+export enum AIProvider {
+  CLOUD = 'CLOUD', // Google Gemini
+  LOCAL = 'LOCAL'  // Ollama + Whisper
+}
+
 export type Language = 'en' | 'zh-TW';
 
 export type EmotionType = 'JOY' | 'SADNESS' | 'FEAR' | 'CALM';
@@ -74,6 +78,12 @@ export interface EMDRSettings {
   durationSeconds: number; // 0 for infinite (Manual/Passes mode)
   targetPasses: number; // 0 for infinite (Manual/Timer mode)
   freezeSensitivity: number; // 0-100
+  
+  // AI Configuration
+  aiProvider: AIProvider;
+  ollamaUrl: string; // e.g., http://localhost:11434
+  ollamaModel: string; // e.g., llama3
+  whisperUrl: string; // e.g., http://localhost:8000/v1/audio/transcriptions
   
   // LiveKit Configuration
   liveKitUrl: string;

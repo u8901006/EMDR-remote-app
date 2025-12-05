@@ -1,9 +1,11 @@
 
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Sparkles, Send, AlertCircle, FileText, User, X } from 'lucide-react';
-import { ChatMessage } from '../types';
-import { generateAssistantResponse, suggestGroundingTechnique } from '../services/gemini';
+import { ChatMessage, EMDRSettings } from '../types';
+import { generateAssistantResponse, suggestGroundingTechnique } from '../services/aiService';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useBroadcastSession } from '../hooks/useBroadcastSession';
+import { SessionRole } from '../types';
 
 export interface AIAssistantHandle {
     triggerPrompt: (text: string, mode?: 'chat' | 'summary') => void;
@@ -16,13 +18,15 @@ interface AIAssistantProps {
 
 const AIAssistant = forwardRef<AIAssistantHandle, AIAssistantProps>((props, ref) => {
   const { t, language } = useLanguage();
+  // Get settings to know AI provider configuration
+  const { settings } = useBroadcastSession(SessionRole.THERAPIST);
+  
   const [input, setInput] = useState('');
   const [inputMode, setInputMode] = useState<'chat' | 'grounding'>('chat');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Track the intention of the current request to pass correct mode to callback
   const pendingRequestMode = useRef<'chat' | 'summary'>('chat');
 
   useEffect(() => {
@@ -62,7 +66,7 @@ const AIAssistant = forwardRef<AIAssistantHandle, AIAssistantProps>((props, ref)
         };
         setMessages(prev => [...prev, userMsg]);
 
-        const responseText = await suggestGroundingTechnique(textToSend, language);
+        const responseText = await suggestGroundingTechnique(textToSend, language, settings);
 
         const aiMsg: ChatMessage = {
             id: (Date.now() + 1).toString(),
@@ -82,7 +86,12 @@ const AIAssistant = forwardRef<AIAssistantHandle, AIAssistantProps>((props, ref)
         };
         setMessages(prev => [...prev, userMsg]);
 
-        const responseText = await generateAssistantResponse(textToSend, messages, language);
+        const responseText = await generateAssistantResponse({ 
+            prompt: textToSend, 
+            history: messages, 
+            language, 
+            settings 
+        });
 
         const aiMsg: ChatMessage = {
             id: (Date.now() + 1).toString(),
@@ -95,14 +104,12 @@ const AIAssistant = forwardRef<AIAssistantHandle, AIAssistantProps>((props, ref)
         if (props.onResponseGenerated) {
             props.onResponseGenerated(responseText, pendingRequestMode.current);
         }
-        // Reset mode
         pendingRequestMode.current = 'chat';
     }
     
     setIsLoading(false);
   };
 
-  // Expose methods to parent
   useImperativeHandle(ref, () => ({
       triggerPrompt: (text: string, mode: 'chat' | 'summary' = 'chat') => {
           pendingRequestMode.current = mode;
