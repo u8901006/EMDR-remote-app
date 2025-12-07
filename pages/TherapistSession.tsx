@@ -1,46 +1,62 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle, Activity, Sliders, Video, FileText, Sparkles, BookOpen } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Activity, Sliders, Video, FileText, Sparkles, BookOpen, Hand } from 'lucide-react';
 import TherapistControls from '../components/TherapistControls';
 import EMDRCanvas from '../components/EMDRCanvas';
 import AIAssistant, { AIAssistantHandle } from '../components/AIAssistant';
 import LiveVideo from '../components/LiveVideo';
 import DraggableWindow from '../components/DraggableWindow';
 import ScriptPanel from '../components/ScriptPanel';
+import ZenCanvas from '../components/ZenCanvas';
+import ZenControls from '../components/ZenControls';
 import { useBroadcastSession } from '../hooks/useBroadcastSession';
 import { SessionRole } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useHandTracking } from '../hooks/useHandTracking';
 
 const TherapistSession: React.FC = () => {
   const { t } = useLanguage();
-  const { settings, updateSettings, clientStatus } = useBroadcastSession(SessionRole.THERAPIST);
+  const { settings, updateSettings, clientStatus, sendZenHands } = useBroadcastSession(SessionRole.THERAPIST);
   
+  // Hand Tracking Logic
+  const { hands, isInitializing: isHandsInitializing } = useHandTracking(settings.zen.active);
+  
+  // Broadcast hand positions to client (Zen Mode)
+  useEffect(() => {
+    if (settings.zen.active && hands.length > 0) {
+        sendZenHands(hands);
+    }
+  }, [settings.zen.active, hands, sendZenHands]);
+
   // Window State
   const [windows, setWindows] = useState({
       controls: true,
       video: true,
       scripts: false,
-      ai: false
+      ai: false,
+      zenControls: false // New window for Zen
   });
+
+  // Auto-open Zen Controls when active
+  useEffect(() => {
+    if (settings.zen.active) {
+        setWindows(prev => ({ ...prev, zenControls: true }));
+    } else {
+        setWindows(prev => ({ ...prev, zenControls: false }));
+    }
+  }, [settings.zen.active]);
 
   const toggleWindow = (key: keyof typeof windows) => {
       setWindows(prev => ({ ...prev, [key]: !prev[key] }));
   };
   
-  // Store the latest AI summary for the report
   const [latestSummary, setLatestSummary] = useState<string>('');
-  
-  // Teleprompter State
   const [teleprompterText, setTeleprompterText] = useState<string | null>(null);
-
-  // Ref to control AI Assistant from other components
   const aiAssistantRef = useRef<AIAssistantHandle>(null);
 
   const handleRequestSummary = (text: string) => {
     if (aiAssistantRef.current) {
         setWindows(prev => ({ ...prev, ai: true }));
-        // Small delay to ensure window is mounted before triggering
         setTimeout(() => aiAssistantRef.current?.triggerPrompt(text, 'summary'), 100);
     }
   };
@@ -60,11 +76,15 @@ const TherapistSession: React.FC = () => {
       
       {/* 1. Background Layer: Canvas & Frozen Alerts */}
       <div className="absolute inset-0 z-0">
-          <EMDRCanvas 
-            settings={settings} 
-            role={SessionRole.THERAPIST} 
-            onSessionComplete={handleSessionComplete}
-          />
+          {settings.zen.active ? (
+              <ZenCanvas settings={settings.zen} hands={hands} />
+          ) : (
+              <EMDRCanvas 
+                settings={settings} 
+                role={SessionRole.THERAPIST} 
+                onSessionComplete={handleSessionComplete}
+              />
+          )}
           
            {/* Frozen Overlay for Canvas */}
            {clientStatus?.isFrozen && (
@@ -132,6 +152,26 @@ const TherapistSession: React.FC = () => {
                 />
             </DraggableWindow>
           </div>
+          
+           {/* Zen Controls Window */}
+           <div className="pointer-events-auto">
+            <DraggableWindow 
+                title="Zen Controls"
+                icon={<Hand size={14} className="text-cyan-400" />}
+                isOpen={windows.zenControls} 
+                onClose={() => toggleWindow('zenControls')}
+                defaultPosition={{ x: window.innerWidth - 340, y: 70 }}
+                width={300}
+                height={550}
+            >
+                <ZenControls 
+                    settings={settings.zen}
+                    updateSettings={(s) => updateSettings({ zen: { ...settings.zen, ...s } })}
+                    onClose={() => toggleWindow('zenControls')}
+                    isHandTrackingActive={hands.length > 0}
+                />
+            </DraggableWindow>
+          </div>
 
           {/* Video Window */}
           <div className="pointer-events-auto">
@@ -140,7 +180,7 @@ const TherapistSession: React.FC = () => {
                 icon={<Video size={14} className="text-green-400" />}
                 isOpen={windows.video} 
                 onClose={() => toggleWindow('video')}
-                defaultPosition={{ x: window.innerWidth - 340, y: 70 }}
+                defaultPosition={{ x: window.innerWidth - 340, y: settings.zen.active ? 640 : 70 }}
                 width={320}
                 height={240}
             >
@@ -221,6 +261,15 @@ const TherapistSession: React.FC = () => {
                 label={t('dock.ai')}
                 color="amber"
               />
+               {settings.zen.active && (
+                  <DockItem 
+                    active={windows.zenControls} 
+                    onClick={() => toggleWindow('zenControls')} 
+                    icon={<Hand size={20} />} 
+                    label="Zen"
+                    color="cyan"
+                  />
+               )}
           </div>
       </div>
     </div>
@@ -234,6 +283,7 @@ const DockItem: React.FC<{ active: boolean; onClick: () => void; icon: React.Rea
         green: 'text-green-400 bg-green-500/20 border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.3)]',
         purple: 'text-purple-400 bg-purple-500/20 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]',
         amber: 'text-amber-400 bg-amber-500/20 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.3)]',
+        cyan: 'text-cyan-400 bg-cyan-500/20 border-cyan-500/50 shadow-[0_0_15px_rgba(34,211,238,0.3)]',
     }[color] || 'text-slate-400';
 
     return (

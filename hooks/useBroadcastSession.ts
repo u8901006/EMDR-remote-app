@@ -1,7 +1,7 @@
 
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { EMDRSettings, SessionMessage, ClientStatus, SessionMetric, MetricType } from '../types';
+import { EMDRSettings, SessionMessage, ClientStatus, SessionMetric, MetricType, HandPoint } from '../types';
 import { DEFAULT_SETTINGS } from '../constants';
 import { useLiveKitContext } from '../contexts/LiveKitContext';
 import { RoomEvent, DataPacket_Kind, Participant } from 'livekit-client';
@@ -10,6 +10,7 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
   const { room } = useLiveKitContext();
   const [settings, setSettings] = useState<EMDRSettings>(DEFAULT_SETTINGS);
   const [clientStatus, setClientStatus] = useState<ClientStatus | null>(null);
+  const [zenHands, setZenHands] = useState<HandPoint[]>([]);
   
   // Clinical Metrics State
   const [metrics, setMetrics] = useState<SessionMetric[]>([]);
@@ -47,6 +48,8 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
             setPendingMetricRequest(message.metricType);
         } else if (message.type === 'SUBMIT_METRIC' && role === 'THERAPIST' && message.metric) {
             setMetrics(prev => [...prev, message.metric!]);
+        } else if (message.type === 'ZEN_HANDS' && role === 'CLIENT' && message.zenHands) {
+            setZenHands(message.zenHands);
         }
       } catch (e) {
         console.error("Failed to parse data packet:", e);
@@ -80,7 +83,11 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
   // Function for Therapist to update and broadcast settings
   const updateSettings = useCallback((newSettings: Partial<EMDRSettings>) => {
     setSettings(prev => {
+      // Deep merge for nested objects like 'zen'
       const updated = { ...prev, ...newSettings };
+      if (newSettings.zen && prev.zen) {
+          updated.zen = { ...prev.zen, ...newSettings.zen };
+      }
       
       if (role === 'THERAPIST' && room) {
         sendData({
@@ -115,6 +122,18 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
             timestamp: Date.now()
         }, false);
     }
+  }, [role, room]);
+
+  // Function for Therapist to broadcast hand positions (Zen Mode)
+  // Use unreliable (lossy) for high frequency updates
+  const sendZenHands = useCallback((hands: HandPoint[]) => {
+      if (role === 'THERAPIST' && room) {
+          sendData({
+              type: 'ZEN_HANDS',
+              zenHands: hands,
+              timestamp: Date.now()
+          }, false);
+      }
   }, [role, room]);
 
   // --- Metric Logic ---
@@ -154,6 +173,8 @@ export const useBroadcastSession = (role: 'THERAPIST' | 'CLIENT') => {
       pendingMetricRequest,
       setPendingMetricRequest,
       requestMetric,
-      submitMetric
+      submitMetric,
+      zenHands,
+      sendZenHands
   };
 };

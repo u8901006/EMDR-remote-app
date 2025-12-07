@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { EMDRSettings, MovementPattern, VisualTheme, MetricType, SessionMetric, EmotionType, AudioMode, DualAttentionMode, SessionBookmark, AIProvider } from '../types';
-import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp, Smile, Frown, Meh, AlertOctagon, Music, BrainCircuit, Keyboard, Bookmark, UserPlus, Cpu } from 'lucide-react';
+import { Play, Pause, Square, Sliders, Palette, Volume2, VolumeX, Eye, AlertTriangle, Video, ChevronDown, ChevronUp, Gamepad2, Zap, Activity, Clock, Link as LinkIcon, Loader2, Globe, Copy, Check, FolderHeart, Save, Trash2, Mic, MicOff, FileText, Sparkles, Box, FileDown, Repeat, Image as ImageIcon, Upload, ClipboardCheck, TrendingUp, Smile, Frown, Meh, AlertOctagon, Music, BrainCircuit, Keyboard, Bookmark, UserPlus, Cpu, Hand } from 'lucide-react';
 import { PRESET_COLORS, PRESET_BG_COLORS } from '../constants';
 import { useBroadcastSession } from '../hooks/useBroadcastSession';
 import { SessionRole } from '../types';
@@ -361,6 +361,21 @@ ${t('report.generated')}
           </div>
       )}
 
+      {/* ZEN MODE BUTTON */}
+      <div className="p-4 bg-slate-800 border-b border-slate-700">
+           <button 
+                onClick={() => updateSettings({ zen: { ...settings.zen, active: !settings.zen.active } })}
+                className={`w-full py-3 rounded-xl font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
+                    settings.zen.active 
+                    ? 'bg-purple-600 text-white shadow-[0_0_20px_rgba(147,51,234,0.5)] border border-purple-400' 
+                    : 'bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
+                }`}
+           >
+               <Hand size={18} />
+               {settings.zen.active ? 'Exit Zen Mode' : 'Enter Zen Mode'}
+           </button>
+      </div>
+
       <div className="flex-1 overflow-y-auto p-5 space-y-8 custom-scrollbar">
         
         {/* Client Monitor */}
@@ -598,7 +613,6 @@ ${t('report.generated')}
             )}
         </section>
         
-        {/* Presets, Video Config, Playback Controls... (Keeping existing UI for these sections but just wrapping up the file) */}
         {/* Session Presets */}
         <section className="bg-slate-800/30 p-3 rounded-lg border border-slate-700/30">
             <button 
@@ -725,8 +739,6 @@ ${t('report.generated')}
             )}
         </section>
 
-        {/* Playback Controls & Motion Settings & Visuals... */}
-        {/* (Assuming remaining sections are unchanged except for adding ID props if needed, but they are generic) */}
         {/* Playback Controls */}
         <section className="space-y-3">
              <div className="flex items-center justify-between mb-2">
@@ -1010,23 +1022,6 @@ ${t('report.generated')}
                         onChange={(e) => updateSettings({ soundVolume: parseFloat(e.target.value) })}
                         className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
                     />
-
-                    <div className="pt-2">
-                        <label className="text-sm flex items-center gap-2 mb-1">
-                            <Music size={14} className="text-slate-400" />
-                            {t('controls.bgSound')}
-                        </label>
-                        <select 
-                            value={settings.audioMode} 
-                            onChange={handleAudioModeChange} 
-                            className="w-full bg-slate-950 border border-slate-700 rounded-md p-2 text-white outline-none text-xs"
-                        >
-                            <option value={AudioMode.NONE}>{t('audio.none')}</option>
-                            <option value={AudioMode.BINAURAL}>{t('audio.binaural')}</option>
-                            <option value={AudioMode.RAIN}>{t('audio.rain')}</option>
-                            <option value={AudioMode.OCEAN}>{t('audio.ocean')}</option>
-                        </select>
-                    </div>
                 </div>
             </div>
         </section>

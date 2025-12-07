@@ -1,11 +1,10 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Maximize, Minimize, ArrowLeft, Loader2, Settings2, X, Clock, Sliders, Volume2, VolumeX, Gamepad2, Palette, Link as LinkIcon, AlertCircle, Globe, Video, Activity, ChevronDown, ChevronRight, CheckCircle2, Music, Upload, Bookmark } from 'lucide-react';
 import EMDRCanvas from '../components/EMDRCanvas';
 import EyeTracker from '../components/EyeTracker';
 import LiveVideo from '../components/LiveVideo';
+import ZenCanvas from '../components/ZenCanvas';
 import { useBroadcastSession } from '../hooks/useBroadcastSession';
 import { SessionRole, MovementPattern, VisualTheme, AudioMode } from '../types';
 import { useLiveKitContext } from '../contexts/LiveKitContext';
@@ -13,7 +12,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 const ClientSession: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
-  const { settings, updateSettings, sendClientStatus, pendingMetricRequest, submitMetric, setPendingMetricRequest } = useBroadcastSession(SessionRole.CLIENT);
+  const { settings, updateSettings, sendClientStatus, pendingMetricRequest, submitMetric, setPendingMetricRequest, zenHands } = useBroadcastSession(SessionRole.CLIENT);
   const { room, connect, isConnecting, error } = useLiveKitContext();
   const [searchParams, setSearchParams] = useSearchParams();
   
@@ -352,11 +351,15 @@ const ClientSession: React.FC = () => {
         }}
         title={viewMode === 'video' ? "Click to Maximize EMDR" : undefined}
       >
-         <EMDRCanvas 
-            settings={settings} 
-            role={SessionRole.CLIENT} 
-            onSessionComplete={handleSessionComplete}
-         />
+         {settings.zen.active ? (
+              <ZenCanvas settings={settings.zen} hands={zenHands || []} />
+         ) : (
+            <EMDRCanvas 
+                settings={settings} 
+                role={SessionRole.CLIENT} 
+                onSessionComplete={handleSessionComplete}
+            />
+         )}
       </div>
 
       <div className={`transition-all duration-500 ease-in-out absolute ${
@@ -389,7 +392,7 @@ const ClientSession: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 pointer-events-auto">
-             {!settings.isPlaying && viewMode === 'canvas' && (
+             {!settings.isPlaying && !settings.zen.active && viewMode === 'canvas' && (
                  <div className="flex items-center gap-2 text-slate-300 bg-black/60 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 shadow-lg">
                      <Loader2 size={16} className="animate-spin" />
                      <span className="text-xs uppercase tracking-widest font-medium">{t('common.waiting')}</span>

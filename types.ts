@@ -42,6 +42,25 @@ export enum AIProvider {
   LOCAL = 'LOCAL'  // Ollama + Whisper
 }
 
+// Zen / Gesture Mode Types
+export enum ZenShape {
+  SPHERE = 'SPHERE',
+  HEART = 'HEART',
+  SATURN = 'SATURN',
+  FLOWER = 'FLOWER',
+  DONUT = 'DONUT',
+  PYRAMID = 'PYRAMID'
+}
+
+export interface ZenSettings {
+  active: boolean;
+  shape: ZenShape;
+  colorHex: string; // Core Frequency
+  scale: number; // 0.1 - 2.0
+  density: number; // 1000 - 10000
+  luminance: number; // 0.0 - 1.0
+}
+
 export type Language = 'en' | 'zh-TW';
 
 export type EmotionType = 'JOY' | 'SADNESS' | 'FEAR' | 'CALM';
@@ -89,6 +108,9 @@ export interface EMDRSettings {
   liveKitUrl: string;
   liveKitTherapistToken: string;
   liveKitClientToken: string;
+
+  // Zen Mode
+  zen: ZenSettings;
 }
 
 export interface ClientStatus {
@@ -114,12 +136,18 @@ export interface SessionBookmark {
   note: string;
 }
 
+export interface HandPoint {
+  x: number; 
+  y: number;
+}
+
 export interface SessionMessage {
-  type: 'SYNC_SETTINGS' | 'REQUEST_SYNC' | 'SESSION_END' | 'CLIENT_STATUS' | 'REQUEST_METRIC' | 'SUBMIT_METRIC';
+  type: 'SYNC_SETTINGS' | 'REQUEST_SYNC' | 'SESSION_END' | 'CLIENT_STATUS' | 'REQUEST_METRIC' | 'SUBMIT_METRIC' | 'ZEN_HANDS';
   payload?: Partial<EMDRSettings>;
   clientStatus?: ClientStatus;
-  metricType?: MetricType; // For REQUEST_METRIC
-  metric?: SessionMetric;  // For SUBMIT_METRIC
+  metricType?: MetricType; 
+  metric?: SessionMetric; 
+  zenHands?: HandPoint[]; // Therapist hands broadcast to client
   timestamp: number;
 }
 

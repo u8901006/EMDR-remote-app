@@ -1,5 +1,5 @@
 
-import { EMDRSettings, MovementPattern, VisualTheme, AudioMode, DualAttentionMode, AIProvider } from './types';
+import { EMDRSettings, MovementPattern, VisualTheme, AudioMode, DualAttentionMode, AIProvider, ZenShape } from './types';
 
 export const DEFAULT_SETTINGS: EMDRSettings = {
   isPlaying: false,
@@ -35,6 +35,16 @@ export const DEFAULT_SETTINGS: EMDRSettings = {
   liveKitUrl: '',
   liveKitTherapistToken: '',
   liveKitClientToken: '',
+
+  // Zen Defaults
+  zen: {
+    active: false,
+    shape: ZenShape.SATURN,
+    colorHex: '#06b6d4', // Cyan
+    scale: 1.0,
+    density: 3000,
+    luminance: 0.8
+  }
 };
 
 export const BROADCAST_CHANNEL_NAME = 'mindsync-emdr-channel';
@@ -53,6 +63,10 @@ export const PRESET_BG_COLORS = [
   '#000000', // Black
   '#1e293b', // Light Slate
   '#334155', // Grey
+];
+
+export const ZEN_COLORS = [
+    '#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#ffffff'
 ];
 
 export const EMDR_SCRIPTS = [
