@@ -77,7 +77,11 @@ const TherapistSession: React.FC = () => {
       {/* 1. Background Layer: Canvas & Frozen Alerts */}
       <div className="absolute inset-0 z-0">
           {settings.zen.active ? (
-              <ZenCanvas settings={settings.zen} hands={hands} />
+              <ZenCanvas 
+                settings={settings.zen} 
+                hands={hands} 
+                speed={settings.speed}
+              />
           ) : (
               <EMDRCanvas 
                 settings={settings} 

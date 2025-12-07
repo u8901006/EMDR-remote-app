@@ -352,7 +352,11 @@ const ClientSession: React.FC = () => {
         title={viewMode === 'video' ? "Click to Maximize EMDR" : undefined}
       >
          {settings.zen.active ? (
-              <ZenCanvas settings={settings.zen} hands={zenHands || []} />
+              <ZenCanvas 
+                settings={settings.zen} 
+                hands={zenHands || []} 
+                speed={settings.speed}
+              />
          ) : (
             <EMDRCanvas 
                 settings={settings} 

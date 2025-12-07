@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { ClientStatus, EMDRSettings } from '../types';
 import { Eye, EyeOff, Video, Activity, AlertTriangle } from 'lucide-react';
@@ -54,15 +55,23 @@ const EyeTracker: React.FC<EyeTrackerProps> = ({ settings, onStatusChange }) => 
             minTrackingConfidence: 0.5
         });
 
-        faceMesh.onResults(onResults);
+        faceMesh.onResults((results: any) => {
+            if (!isMounted) return;
+            onResults(results);
+        });
+        
         faceMeshRef.current = faceMesh;
 
         if (videoRef.current) {
             // CameraUtils handles the loop: getUserMedia -> requestAnimationFrame -> faceMesh.send()
             const camera = new window.Camera(videoRef.current, {
                 onFrame: async () => {
-                    if (faceMeshRef.current && videoRef.current) {
-                        await faceMeshRef.current.send({ image: videoRef.current });
+                    if (faceMeshRef.current && videoRef.current && isMounted) {
+                        try {
+                            await faceMeshRef.current.send({ image: videoRef.current });
+                        } catch (e) {
+                            // ignore shutdown errors
+                        }
                     }
                 },
                 width: 320, // Low res is sufficient for stability tracking and saves CPU
@@ -89,11 +98,61 @@ const EyeTracker: React.FC<EyeTrackerProps> = ({ settings, onStatusChange }) => 
 
     return () => {
       isMounted = false;
-      if (cameraRef.current) cameraRef.current.stop();
-      if (faceMeshRef.current) faceMeshRef.current.close();
+      if (cameraRef.current) {
+          cameraRef.current.stop();
+          cameraRef.current = null;
+      }
+      
+      const faceMeshInstance = faceMeshRef.current;
+      faceMeshRef.current = null; // Prevent use in onFrame
+      
+      if (faceMeshInstance) {
+          faceMeshInstance.close();
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const calculateDistance = (p1: any, p2: any) => {
+      return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+  };
+
+  const detectEmotion = (landmarks: any[]) => {
+      // Reference Width (Outer Eye corners: 33 Left, 263 Right)
+      const refWidth = calculateDistance(landmarks[33], landmarks[263]);
+      
+      // 1. Mouth Analysis (Smile vs Frown)
+      // Upper Lip Bottom (13) vs Average of Mouth Corners (61, 291)
+      const mouthCornersY = (landmarks[61].y + landmarks[291].y) / 2;
+      const upperLipY = landmarks[13].y;
+      
+      const mouthIndicator = (upperLipY - mouthCornersY) / refWidth;
+
+      // 2. Eye Openness (Fear/Surprise vs Calm)
+      const leftEyeOpen = calculateDistance(landmarks[159], landmarks[145]);
+      const rightEyeOpen = calculateDistance(landmarks[386], landmarks[374]);
+      const avgEyeOpen = (leftEyeOpen + rightEyeOpen) / 2;
+      const eyeOpennessIndicator = avgEyeOpen / refWidth;
+
+      let primary: any = 'CALM';
+      let confidence = 0;
+
+      if (mouthIndicator > 0.05) {
+          primary = 'JOY';
+          confidence = Math.min(100, 50 + (mouthIndicator * 500));
+      } else if (mouthIndicator < -0.04) {
+          primary = 'SADNESS';
+          confidence = Math.min(100, 50 + (Math.abs(mouthIndicator) * 500));
+      } else if (eyeOpennessIndicator > 0.28) {
+          primary = 'FEAR';
+          confidence = Math.min(100, 50 + ((eyeOpennessIndicator - 0.28) * 500));
+      } else {
+          primary = 'CALM';
+          confidence = 90;
+      }
+
+      return { primary, confidence };
+  };
 
   const onResults = (results: any) => {
     // 1. Detection Check
@@ -121,13 +180,10 @@ const EyeTracker: React.FC<EyeTrackerProps> = ({ settings, onStatusChange }) => 
     lowConfidenceFramesRef.current = 0;
     const landmarks = results.multiFaceLandmarks[0];
     
-    // 2. Stability Calculation
-    // We track specific keypoints to determine "Freeze" vs "Motion"
-    // 1: Nose Tip (Head movement)
-    // 468: Left Iris Center
-    // 473: Right Iris Center
-    // 33: Left Eye Corner
-    // 263: Right Eye Corner
+    // 2. Emotion Detection
+    const emotion = detectEmotion(landmarks);
+
+    // 3. Stability Calculation (Freeze Detection)
     const keyPoints = [1, 468, 473, 33, 263];
     let movementSum = 0;
 
@@ -136,34 +192,20 @@ const EyeTracker: React.FC<EyeTrackerProps> = ({ settings, onStatusChange }) => 
             const curr = landmarks[index];
             const prev = prevLandmarksRef.current![index];
             
-            // Euclidean distance between frames for this point
-            // Note: Landmarks are normalized (0.0 - 1.0)
             const dx = curr.x - prev.x;
             const dy = curr.y - prev.y;
-            const dz = curr.z - prev.z; // Depth is rough but useful
+            const dz = curr.z - prev.z;
             movementSum += Math.sqrt(dx*dx + dy*dy + dz*dz);
         });
     }
 
-    // Update history
     prevLandmarksRef.current = landmarks;
 
-    // 3. Score Normalization
-    // Average movement per keypoint
     const avgMovement = movementSum / keyPoints.length;
-    
-    // Convert normalized float to a readable score (0-100)
-    // Typical "Still" noise is ~0.0005. Active eye movement is > 0.005.
-    // We multiply by 10000 to scale it up.
     const rawScore = avgMovement * 10000; 
     const motionScore = Math.min(100, rawScore);
 
-    // 4. Freeze Threshold Logic
-    // settings.freezeSensitivity: 0 (Strict/Hard to freeze) to 100 (Sensitive/Easy to freeze)
     const sensitivity = settings.freezeSensitivity ?? 50;
-    
-    // If sensitivity is High (100), we allow larger movements to still count as "Frozen" (Threshold higher)
-    // If sensitivity is Low (0), we need absolute stillness (Threshold lower)
     const FREEZE_THRESHOLD = 2.0 + (sensitivity / 100) * 15.0;
 
     if (rawScore < FREEZE_THRESHOLD) {
@@ -172,17 +214,15 @@ const EyeTracker: React.FC<EyeTrackerProps> = ({ settings, onStatusChange }) => 
         consecutiveFrozenFramesRef.current = 0;
     }
 
-    // Trigger frozen state if stillness persists for roughly 2 seconds
-    // Depending on FPS, 30-60 frames.
     const isFrozen = consecutiveFrozenFramesRef.current > 45;
 
     const now = Date.now();
-    // Report status (throttle to 500ms)
     if (now - lastReportTimeRef.current > 500) {
         onStatusChange({
             isCameraActive: true,
             isFrozen,
             motionScore,
+            emotion,
             lastUpdate: now
         });
         lastReportTimeRef.current = now;

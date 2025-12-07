@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { HandPoint } from '../types';
 
@@ -15,11 +16,11 @@ export const useHandTracking = (isActive: boolean) => {
   const cameraRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!isActive) {
-        if (cameraRef.current) cameraRef.current.stop();
-        if (handsRef.current) handsRef.current.close();
-        return;
-    }
+    // If not active, we don't start anything. 
+    // Cleanup of previous active session happens in return function.
+    if (!isActive) return;
+
+    let isMounted = true;
 
     const initHands = async () => {
         if (!window.Hands || !window.Camera) {
@@ -41,14 +42,16 @@ export const useHandTracking = (isActive: boolean) => {
         });
 
         handsMesh.onResults((results: any) => {
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const points: HandPoint[] = results.multiHandLandmarks.map((landmarks: any) => {
-                    // Use Index Finger Tip (Landmark 8) as the interaction point
-                    return { x: landmarks[8].x, y: landmarks[8].y }; 
-                });
-                setHands(points);
-            } else {
-                setHands([]);
+            if (isMounted) {
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    const points: HandPoint[] = results.multiHandLandmarks.map((landmarks: any) => {
+                        // Use Index Finger Tip (Landmark 8) as the interaction point
+                        return { x: landmarks[8].x, y: landmarks[8].y }; 
+                    });
+                    setHands(points);
+                } else {
+                    setHands([]);
+                }
             }
         });
 
@@ -64,8 +67,13 @@ export const useHandTracking = (isActive: boolean) => {
 
         const camera = new window.Camera(videoRef.current, {
             onFrame: async () => {
-                if (handsRef.current && videoRef.current) {
-                    await handsRef.current.send({ image: videoRef.current });
+                // Check if mounted and ref exists before sending
+                if (handsRef.current && videoRef.current && isMounted) {
+                    try {
+                        await handsRef.current.send({ image: videoRef.current });
+                    } catch (e) {
+                        // Ignore errors during shutdown
+                    }
                 }
             },
             width: 320,
@@ -74,16 +82,33 @@ export const useHandTracking = (isActive: boolean) => {
         
         cameraRef.current = camera;
         await camera.start();
-        setIsInitializing(false);
+        
+        if (isMounted) {
+            setIsInitializing(false);
+        }
     };
 
     initHands();
 
     return () => {
-        if (cameraRef.current) cameraRef.current.stop();
-        if (handsRef.current) handsRef.current.close();
+        isMounted = false;
+        
+        if (cameraRef.current) {
+            cameraRef.current.stop();
+            cameraRef.current = null;
+        }
+        
+        // Nullify ref before closing to prevent race conditions in onFrame
+        const handsInstance = handsRef.current;
+        handsRef.current = null;
+        
+        if (handsInstance) {
+            handsInstance.close();
+        }
+        
         if (videoRef.current && videoRef.current.parentNode) {
             videoRef.current.parentNode.removeChild(videoRef.current);
+            videoRef.current = null;
         }
     };
   }, [isActive]);
